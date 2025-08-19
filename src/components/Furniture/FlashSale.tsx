@@ -25,12 +25,25 @@ const FlashSale = () => {
                 let foundBanner: BannerType | null = null;
                 snapshot.forEach((childSnapshot) => {
                     const banner = childSnapshot.val();
-                    // Check if banner type matches "home-advertisement" and is active
-                    if (banner.type === 'home-advertisement' && banner.isActive === true) {
-                        foundBanner = {
-                            id: childSnapshot.key!,
-                            ...banner
-                        };
+                    // Check if banner type matches "home-advertisement"
+                    if (banner.type === 'home-advertisement') {
+                        // Check if end date is valid and not expired (if provided)
+                        if (banner.endDate) {
+                            const now = new Date();
+                            const endDate = new Date(banner.endDate);
+                            if (endDate >= now) {
+                                foundBanner = {
+                                    id: childSnapshot.key!,
+                                    ...banner
+                                };
+                            }
+                        } else {
+                            // No end date provided, assume banner is always valid
+                            foundBanner = {
+                                id: childSnapshot.key!,
+                                ...banner
+                            };
+                        }
                     }
                 });
                 

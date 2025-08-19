@@ -9,6 +9,10 @@ import Footer from '@/components/Footer/Footer'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
 import { signIn } from '@/firebase/auth'
 import { readData } from '@/firebase/database';
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
+import BannerTop from '@/components/Home3/BannerTop'
+
 
 const Login = () => {
     const router = useRouter();
@@ -65,11 +69,16 @@ const Login = () => {
 
     return (
         <>
-            <TopNavOne props="style-one bg-black" slogan="New customers save 10% with the code GET10" />
-            <div id="header" className='relative w-full'>
-                <MenuOne props="bg-transparent" />
-                <Breadcrumb heading='Login' subHeading='Login' />
-            </div>
+    
+
+<div id="header" className='relative w-full'>
+<BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+ <MenuFurniture props="bg-white" />
+ <MenuCategory />
+ <Breadcrumb heading='Login' subHeading='Login' />
+ </div>
+
+
             <div className="login-block md:py-20 py-10">
                 <div className="container">
                     <div className="content-main flex gap-y-8 max-md:flex-col">

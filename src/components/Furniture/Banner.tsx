@@ -27,12 +27,11 @@ const Banner = () => {
                 const bannersData: BannerType[] = [];
                 snapshot.forEach((childSnapshot) => {
                     const banner = childSnapshot.val();
-                    // Check if banner type matches our criteria and is active
+                    // Check if banner type matches our criteria
                     if (banner.type && 
                         (banner.type === 'banner-category-1' || 
                          banner.type === 'banner-category-2' || 
-                         banner.type === 'banner-category-3') &&
-                        banner.isActive === true) {
+                         banner.type === 'banner-category-3')) {
                         bannersData.push({
                             id: childSnapshot.key!,
                             ...banner

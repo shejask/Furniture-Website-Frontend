@@ -3,11 +3,12 @@
 // CartContext.tsx
 import React, { createContext, useContext, useState, useReducer, useEffect } from 'react';
 import { ProductType } from '@/type/ProductType';
-import { addOrUpdateFirebaseCartItem, removeFirebaseCartItem, updateFirebaseCartItemFields } from '@/firebase/cart';
+import { addOrUpdateFirebaseCartItem, removeFirebaseCartItem, updateFirebaseCartItemFields, overwriteFirebaseCartFromItems } from '@/firebase/cart';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/firebase/config';
 import { ref, onValue } from 'firebase/database';
 import { database } from '@/firebase/config';
+import { useRouter } from 'next/navigation';
 
 interface CartItem extends ProductType {
     quantity: number
@@ -31,9 +32,10 @@ type CartAction =
 
 interface CartContextProps {
     cartState: CartState;
-    addToCart: (item: ProductType) => void;
+    addToCart: (item: ProductType) => Promise<boolean>; // Return boolean to indicate success/failure
     removeFromCart: (itemId: string) => void;
     updateCart: (itemId: string, quantity: number, selectedSize: string, selectedColor: string) => void;
+    requireLogin: () => void; // Function to handle login requirement
 }
 
 const CartContext = createContext<CartContextProps | undefined>(undefined);
@@ -75,76 +77,31 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     }
 };
 
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [cartState, dispatch] = useReducer(cartReducer, { cartArray: [] });
-    const [user] = useAuthState(auth);
 
-    const addToCart = (item: ProductType) => {
-        dispatch({ type: 'ADD_TO_CART', payload: item });
-        if (user) {
-            // Save immediately with default quantity 1 and empty selections
-            (async () => {
-                try {
-                    await addOrUpdateFirebaseCartItem(user.uid, item, 1, '', '');
-                } catch (e) {
-                    // no-op: keep local state even if remote fails
-                }
-            })();
-        }
-    };
 
-    const removeFromCart = (itemId: string) => {
-        dispatch({ type: 'REMOVE_FROM_CART', payload: itemId });
-        if (user) {
-            (async () => {
-                try {
-                    await removeFirebaseCartItem(user.uid, itemId);
-                } catch (e) {
-                    // ignore remote error
-                }
-            })();
-        }
-    };
 
-    const updateCart = (itemId: string, quantity: number, selectedSize: string, selectedColor: string) => {
-        dispatch({ type: 'UPDATE_CART', payload: { itemId, quantity, selectedSize, selectedColor } });
-        if (user) {
-            (async () => {
-                try {
-                    await updateFirebaseCartItemFields(user.uid, itemId, { quantity, selectedSize, selectedColor });
-                } catch (e) {
-                    // ignore remote error
-                }
-            })();
-        }
-    };
 
-    return (
-        <CartContext.Provider value={{ cartState, addToCart, removeFromCart, updateCart }}>
-            {children}
-        </CartContext.Provider>
-    );
-};
-
-// Load cart from Firebase whenever the authenticated user changes
-// and keep it in sync in real-time
-export const CartLoader: React.FC = () => {
-    const { cartState } = useCart();
-    const [user] = useAuthState(auth);
-    const { addToCart } = useCart();
-    return null;
-};
-
-// Attach a subscription inside provider
+    // SECOND CART PROVIDER - with Firebase sync
 export const CartProviderWithSync: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [cartState, dispatch] = useReducer(cartReducer, { cartArray: [] });
     const [user] = useAuthState(auth);
+    const router = useRouter();
 
+    const requireLogin = () => {
+        router.push('/login');
+    };
+
+
+
+    // Sync with Firebase when user changes
     useEffect(() => {
         if (!user) {
+            // User logged out, clear cart
             dispatch({ type: 'LOAD_CART', payload: [] });
             return;
         }
+
+        // Listen to Firebase cart changes
         const productsRef = ref(database, `/customers/${user.uid}/cart/products`);
         const off = onValue(productsRef, (snapshot) => {
             const productsObj = snapshot.val() || {};
@@ -186,41 +143,61 @@ export const CartProviderWithSync: React.FC<{ children: React.ReactNode }> = ({ 
         return () => off();
     }, [user?.uid]);
 
-    const addToCart = (item: ProductType) => {
+
+
+    const addToCart = async (item: ProductType): Promise<boolean> => {
+        // Check if user is logged in
+        if (!user) {
+            // User not logged in, redirect to login page
+            router.push('/login');
+            return false;
+        }
+
+        // User is logged in, add to cart
         dispatch({ type: 'ADD_TO_CART', payload: item });
-        if (user) {
-            (async () => {
-                try {
-                    await addOrUpdateFirebaseCartItem(user.uid, item, 1, '', '');
-                } catch (e) {}
-            })();
+        
+        // Save to Firebase for authenticated users
+        try {
+            await addOrUpdateFirebaseCartItem(user.uid, item, 1, '', '');
+            return true;
+        } catch (e) {
+            console.error('Error saving to Firebase:', e);
+            return false;
         }
     };
 
     const removeFromCart = (itemId: string) => {
         dispatch({ type: 'REMOVE_FROM_CART', payload: itemId });
+        
+        // Save to Firebase for authenticated users
         if (user) {
             (async () => {
                 try {
                     await removeFirebaseCartItem(user.uid, itemId);
-                } catch (e) {}
+                } catch (e) {
+                    console.error('Error removing from Firebase:', e);
+                }
             })();
         }
     };
 
     const updateCart = (itemId: string, quantity: number, selectedSize: string, selectedColor: string) => {
         dispatch({ type: 'UPDATE_CART', payload: { itemId, quantity, selectedSize, selectedColor } });
+        
+        // Save to Firebase for authenticated users
         if (user) {
             (async () => {
                 try {
                     await updateFirebaseCartItemFields(user.uid, itemId, { quantity, selectedSize, selectedColor });
-                } catch (e) {}
+                } catch (e) {
+                    console.error('Error updating Firebase:', e);
+                }
             })();
         }
     };
 
     return (
-        <CartContext.Provider value={{ cartState, addToCart, removeFromCart, updateCart }}>
+        <CartContext.Provider value={{ cartState, addToCart, removeFromCart, updateCart, requireLogin }}>
             {children}
         </CartContext.Provider>
     );

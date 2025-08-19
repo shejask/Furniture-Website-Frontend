@@ -21,7 +21,7 @@ const Footer = () => {
                                         <span className="text-button mt-3">Address:</span>
                                     </div>
                                     <div className="flex flex-col ">
-                                        <span className=''>hi.avitex@gmail.com</span>
+                                        <span className=''>smeraasinnovate@gmail.com</span>
                                         <span className='mt-3'>+91 8590318931</span>
                                         <span className='mt-3 pt-px'>9F ,sunpaul blueberry dezeria,Kakkanad,Ernakulam</span>
                                     </div>
@@ -32,6 +32,7 @@ const Footer = () => {
                                     <div className="item flex flex-col basis-1/3 ">
                                         <div className="text-button-uppercase pb-3">Infomation</div>
                                         <Link className='caption1 has-line-before duration-300 w-fit' href={'/pages/contact'}>Contact us</Link>
+                                        <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/pages/about'}>About Us </Link>
                                          <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/my-account'}>My Account</Link>
                                          <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/pages/faqs'}>FAQ </Link>
 

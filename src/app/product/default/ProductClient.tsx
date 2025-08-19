@@ -44,6 +44,20 @@ interface FirebaseProductType {
     tags: string[];
     trending: boolean;
     unit: string;
+    // New Firebase fields for specifications
+    variableOptions?: Array<{
+        name: string;
+        values: string[];
+    }>;
+    weight?: number;
+    estimatedDeliveryText?: string;
+    dimensions?: string;
+    roomType?: string;
+    warrantyTime?: string;
+    bestSeller?: boolean;
+    onSale?: boolean;
+    newArrivals?: boolean;
+    featured?: boolean;
 }
 
 const ProductClient = ({ productId }: { productId: string | null }) => {
@@ -65,6 +79,10 @@ const ProductClient = ({ productId }: { productId: string | null }) => {
 
                 if (snapshot.exists()) {
                     const productData = snapshot.val();
+                    console.log('🔥 Raw Firebase product data:', productData);
+                    console.log('🔥 Variable options:', productData.variableOptions);
+                    console.log('🔥 Weight:', productData.weight);
+                    console.log('🔥 Dimensions:', productData.dimensions);
                     setProduct({
                         ...productData,
                         id: productId
@@ -99,34 +117,48 @@ const ProductClient = ({ productId }: { productId: string | null }) => {
         );
     }
 
-    // Convert Firebase product data to match the expected ProductType format
-    const convertedProduct: ProductType = {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        description: product.description || '',
-        shortDescription: product.shortDescription,
-        rate: 5, // Default value
-        images: product.images || [product.thumbnail],
-        slug: product.slug,
-        category: product.categories?.[0] || '',
-        type: 'fashion',
-        quantity: product.stockQuantity,
-        sale: product.discount > 0,
-        new: false,
-        brand: product.brands?.[0] || '',
-        sold: 0,
-        sizes: Array.isArray(product.attributes?.sizes) ? product.attributes.sizes : ['S', 'M', 'L', 'XL'],
-        variation: Array.isArray(product.attributes?.variations) ? product.attributes.variations : [],
-        thumbImage: [product.thumbnail],
-        quantityPurchase: 1,
-        originPrice: product.price,
-        salePrice: product.salePrice || product.price,
-        gender: product.attributes?.gender || 'unisex',
-        action: 'add-to-cart',
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt
-    };
+            // Convert Firebase product data to match the expected ProductType format
+        const convertedProduct: ProductType = {
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            description: product.description || '',
+            shortDescription: product.shortDescription,
+            rate: 5, // Default value
+            images: product.images || [product.thumbnail],
+            slug: product.slug,
+            category: product.categories?.[0] || '',
+            categories: product.categories, // Include the full categories array
+            type: 'fashion',
+            quantity: product.stockQuantity,
+            sale: product.discount > 0,
+            new: false,
+            brand: product.brands?.[0] || '',
+            brands: product.brands, // Include the full brands array
+            sold: 0,
+            sizes: Array.isArray(product.attributes?.sizes) ? product.attributes.sizes : ['S', 'M', 'L', 'XL'],
+            variation: Array.isArray(product.attributes?.variations) ? product.attributes.variations : [],
+            thumbImage: [product.thumbnail],
+            quantityPurchase: 1,
+            originPrice: product.price,
+            salePrice: product.salePrice || product.price,
+            gender: product.attributes?.gender || 'unisex',
+            action: 'add-to-cart',
+            createdAt: product.createdAt,
+            updatedAt: product.updatedAt,
+            // New Firebase fields for specifications
+            variableOptions: product.variableOptions,
+            weight: product.weight,
+            estimatedDeliveryText: product.estimatedDeliveryText,
+            dimensions: product.dimensions,
+            roomType: product.roomType,
+            warrantyTime: product.warrantyTime,
+            bestSeller: product.bestSeller,
+            onSale: product.onSale,
+            newArrivals: product.newArrivals,
+            trending: product.trending,
+            featured: product.featured
+        };
 
     return (
         <>

@@ -1,31 +1,48 @@
 export interface FirebaseProductType {
     id: string;
-    name: string;
-    description?: string;
-    shortDescription?: string;
-    price: number;
-    salePrice: number;
-    images?: string[];
-    thumbnail: string;
-    category?: string;
     productType: 'physical' | 'digital';
-    status: 'enabled' | 'disabled';
-    stockStatus: 'in_stock' | 'out_of_stock';
-    stockQuantity: number;
-    sku: string;
+    vendor: string;
+    name: string;
     slug: string;
-    unit?: string;
-    weight?: number;
-    sizeChart?: string;
-    trending?: boolean;
-    featured?: boolean;
-    vendor?: string;
-    tags?: Array<{
-        id: string;
+    shortDescription?: string;
+    description?: string;
+    thumbnail: string;
+    images?: string[];
+    inventoryType: 'variable' | 'simple';
+    stockStatus: 'in_stock' | 'out_of_stock';
+    sku: string;
+    stockQuantity: number;
+    price: number;
+    discount?: number;
+    salePrice: number;
+    commissionAmount?: number;
+    variableOptions?: Array<{
         name: string;
+        values: string[];
     }>;
+    tags?: string[];
+    categories?: string[];
+    brands?: string[];
+    metaTitle?: string;
+    metaDescription?: string;
+    metaImage?: string;
+    weight?: number;
+    estimatedDeliveryText?: string;
+    dimensions?: string;
+    roomType?: string;
+    warrantyTime?: string;
+    new: boolean;
+    bestSeller: boolean;
+    onSale: boolean;
+    newArrivals: boolean;
+    trending: boolean;
+    featured: boolean;
     createdAt: string;
     updatedAt: string;
+    // Legacy fields for backward compatibility
+    status?: 'enabled' | 'disabled';
+    unit?: string;
+    sizeChart?: string;
     randomRelatedProduct?: boolean;
     wholesalePriceType?: string;
 }
@@ -35,6 +52,32 @@ export const convertFirebaseToUIProduct = (product: FirebaseProductType) => {
     const now = new Date();
     const createdDate = new Date(product.createdAt);
     const isNew = now.getTime() - createdDate.getTime() < 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    // Extract sizes and colors from variableOptions if available
+    const sizes: string[] = [];
+    const variation: Array<{
+        color: string;
+        colorCode: string;
+        colorImage: string;
+        image: string;
+    }> = [];
+
+    if (product.variableOptions) {
+        product.variableOptions.forEach(option => {
+            if (option.name.toLowerCase() === 'size') {
+                sizes.push(...option.values);
+            } else if (option.name.toLowerCase() === 'color') {
+                option.values.forEach(color => {
+                    variation.push({
+                        color,
+                        colorCode: color.toLowerCase(),
+                        colorImage: product.thumbnail,
+                        image: product.thumbnail
+                    });
+                });
+            }
+        });
+    }
 
     return {
         id: product.id,
@@ -50,27 +93,35 @@ export const convertFirebaseToUIProduct = (product: FirebaseProductType) => {
         sold: 0,
         description: product.description || product.shortDescription || '',
         shortDescription: product.shortDescription,
-        category: product.category || '',
+        category: product.categories?.[0] || '',
         type: product.productType,
-        status: product.status,
+        status: product.status || 'enabled',
         stockStatus: product.stockStatus,
         trending: product.trending || false,
         featured: product.featured || false,
-        new: isNew,
-        sale: product.salePrice > 0,
-        isActive: product.status === 'enabled',
-        variation: [],
-        sizes: [],
+        new: product.new || isNew,
+        sale: product.onSale || product.salePrice > 0,
+        isActive: (product.status || 'enabled') === 'enabled',
+        variation: variation,
+        sizes: sizes,
         rate: 5,
         review: 0,
         gender: '',
-        brand: '',
+        brand: product.brands?.[0] || '',
         action: 'add to cart',
         quantityPurchase: 1,
         vendor: product.vendor,
         unit: product.unit,
         weight: product.weight,
         sizeChart: product.sizeChart,
-        tags: product.tags
+        tags: product.tags || [],
+        discount: product.discount,
+        estimatedDeliveryText: product.estimatedDeliveryText,
+        dimensions: product.dimensions,
+        roomType: product.roomType,
+        warrantyTime: product.warrantyTime,
+        bestSeller: product.bestSeller || false,
+        onSale: product.onSale || false,
+        newArrivals: product.newArrivals || false
     }
 }

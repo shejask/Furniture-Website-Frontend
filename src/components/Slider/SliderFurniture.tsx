@@ -16,11 +16,11 @@ interface BannerData {
     createdAt: string;
     description: string;
     displayOrder: number;
-    endDate: string;
+    endDate?: string; // Made optional
     imageUrl: string;
-    isActive: boolean;
+    isActive?: boolean; // Made optional
     linkUrl: string;
-    startDate: string;
+    startDate?: string; // Made optional
     title: string;
     type: string;
     updatedAt: string;
@@ -54,13 +54,19 @@ const SliderFurniture = () => {
                             
                             // Check specific conditions
                             if (banner.type !== 'banner') return false;
-                            if (!banner.isActive) return false;
+                            // If isActive is not provided, assume it's active
+                            if (banner.isActive === false) return false;
                             if (banner.displayOrder !== 1) return false;
                             
                             // Check if end date is valid and not expired
-                            const now = new Date();
-                            const endDate = new Date(banner.endDate);
-                            return endDate >= now;
+                            // If no end date is provided, assume the banner is always valid
+                            if (banner.endDate) {
+                                const now = new Date();
+                                const endDate = new Date(banner.endDate);
+                                if (endDate < now) return false;
+                            }
+                            
+                            return true;
                         });
                     setBanners(activeBanners as BannerData[]);
                 }

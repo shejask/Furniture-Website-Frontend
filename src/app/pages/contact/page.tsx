@@ -7,6 +7,10 @@ import MenuOne from '@/components/Header/Menu/MenuOne'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb';
 import Footer from '@/components/Footer/Footer'
 import { createData } from '@/firebase/database'
+import BannerTop from '@/components/Home3/BannerTop'
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
+
 
 const ContactUs = () => {
     const [formData, setFormData] = useState({
@@ -50,11 +54,19 @@ const ContactUs = () => {
 
     return (
         <>
-            <TopNavOne props="style-one bg-black" slogan="New customers save 10% with the code GET10" />
+        
+
+
+
             <div id="header" className='relative w-full'>
-                <MenuOne props="bg-transparent" />
-                <Breadcrumb heading='Contact us' subHeading='Contact us' />
-            </div>
+        <BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+         <MenuFurniture props="bg-white" />
+         <MenuCategory />
+         <Breadcrumb heading='Contact us' subHeading='Contact us' />
+         </div>
+
+
+
             <div className='contact-us md:py-20 py-10'>
                 <div className="container">
                     <div className="flex justify-between max-lg:flex-col gap-y-10">
@@ -126,7 +138,7 @@ const ContactUs = () => {
                                 <div className="heading4">Our Store</div>
                                 <p className="mt-3">9F ,sunpaul blueberry dezeria,Kakkanad,Ernakulam</p>
                                 <p className="mt-3">Phone: <span className='whitespace-nowrap'>+91 8590318931</span></p>
-                                <p className="mt-1">Email: <span className='whitespace-nowrap'>hi.avitex@gmail.com</span></p>
+                                <p className="mt-1">Email: <span className='whitespace-nowrap'>smeraasinnovate@gmail.com</span></p>
                             </div>
                             
                         </div>

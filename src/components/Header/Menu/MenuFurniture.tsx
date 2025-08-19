@@ -36,10 +36,62 @@ const MenuFurniture: React.FC<Props> = ({ props }) => {
     const [searching, setSearching] = useState<boolean>(false)
     const [searchResults, setSearchResults] = useState<ProductType[]>([])
     const router = useRouter()
+    
+    // Authentication state
+    const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false)
+    const [user, setUser] = useState<any>(null)
 
     const handleSearch = (value: string) => {
         router.push(`/search-result?query=${value}`)
         setSearchKeyword('')
+    }
+
+    // Check authentication status on component mount
+    useEffect(() => {
+        const checkAuthStatus = () => {
+            const userStr = localStorage.getItem('user')
+            if (userStr) {
+                try {
+                    const userData = JSON.parse(userStr)
+                    setUser(userData)
+                    setIsLoggedIn(true)
+                } catch (error) {
+                    console.error('Error parsing user data:', error)
+                    setIsLoggedIn(false)
+                    setUser(null)
+                }
+            } else {
+                setIsLoggedIn(false)
+                setUser(null)
+            }
+        }
+
+        checkAuthStatus()
+        
+        // Listen for storage changes (when user logs in/out in other tabs)
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === 'user') {
+                checkAuthStatus()
+            }
+        }
+
+        window.addEventListener('storage', handleStorageChange)
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange)
+        }
+    }, [])
+
+    const handleLogout = () => {
+        localStorage.removeItem('user')
+        setIsLoggedIn(false)
+        setUser(null)
+        // Close the popup if it's open
+        if (openLoginPopup) {
+            handleLoginPopup()
+        }
+        // Redirect to home page
+        router.push('/')
     }
 
     useEffect(() => {
@@ -286,13 +338,30 @@ const MenuFurniture: React.FC<Props> = ({ props }) => {
                                         className={`login-popup absolute top-[74px] w-[320px] p-7 rounded-xl bg-white box-shadow-sm 
                                             ${openLoginPopup ? 'open' : ''}`}
                                     >
-                                        <Link href={'/login'} className="button-main w-full text-center">Login</Link>
-                                        <div className="text-secondary text-center mt-3 pb-4">Don’t have an account?
-                                            <Link href={'/register'} className='text-black pl-1 hover:underline'>Register</Link>
-                                        </div>
-                                        <Link href={'/my-account'} className="button-main bg-white text-black border border-black w-full text-center">Dashboard</Link>
+                                        {!isLoggedIn ? (
+                                            <>
+                                                <Link href={'/login'} className="button-main w-full text-center">Login</Link>
+                                                <div className="text-secondary text-center mt-3 pb-4">Don&apos;t have an account?
+                                                    <Link href={'/register'} className='text-black pl-1 hover:underline'>Register</Link>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="text-center mb-4">
+                                                    <div className="text-black font-medium">Welcome back!</div>
+                                                    <div className="text-secondary text-sm">{user?.email || user?.name || 'User'}</div>
+                                                </div>
+                                                <Link href={'/my-account'} className="button-main w-full text-center">Dashboard</Link>
+                                                <button 
+                                                    onClick={handleLogout}
+                                                    className="button-main bg-white text-black border border-black w-full text-center mt-3"
+                                                >
+                                                    Logout
+                                                </button>
+                                            </>
+                                        )}
                                         <div className="bottom mt-4 pt-4 border-t border-line"></div>
-                                        <Link href={'#!'} className='body1 hover:underline'>Support</Link>
+                                        <Link href={'/pages/contact'} className='body1 hover:underline'>Support</Link>
                                     </div>
                                 </div>
                                 <div className="max-md:hidden wishlist-icon flex items-center cursor-pointer" onClick={openModalWishlist}>

@@ -82,13 +82,21 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                     salePrice: data.price,
                     thumbnail: data.thumbImage[0],
                     productType: 'physical' as const,
+                    vendor: 'admin',
+                    inventoryType: 'simple',
                     status: 'enabled',
                     stockStatus: 'in_stock',
                     stockQuantity: data.quantity,
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     sku: data.id,
-                    slug: data.name.toLowerCase().replace(/\s+/g, '-')
+                    slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+                    new: false,
+                    bestSeller: false,
+                    onSale: false,
+                    newArrivals: false,
+                    trending: false,
+                    featured: false
                 };
                 console.log('Firebase product to save:', firebaseProduct);
                 
@@ -123,26 +131,26 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
     };
 
     const displayPrice = (data as any).salePrice ?? data.price;
-    let percentSale = Math.floor(100 - ((displayPrice / data.originPrice) * 100))
-    let percentSold = Math.floor((data.sold / data.quantity) * 100)
+    const originalPrice = data.originPrice || data.price;
+    let percentSale = originalPrice > displayPrice ? Math.floor(100 - ((displayPrice / originalPrice) * 100)) : 0;
+    let percentSold = data.quantity > 0 ? Math.floor((data.sold / data.quantity) * 100) : 0;
 
     return (
         <>
             {type === "grid" ? (
                 <div className={`product-item grid-type ${style}`}>
-                    <div onClick={() => handleDetailProduct(data.id)} className="product-main cursor-pointer block">
-                        <div className="product-thumb bg-white relative overflow-hidden rounded-2xl">
-                            {data.new && (
-                                <div className="product-tag text-button-uppercase bg-green px-3 py-0.5 inline-block rounded-full absolute top-3 left-3 z-[1]">
-                                    New
-                                </div>
-                            )}
-                            {data.sale && (
-                                <div className="product-tag text-button-uppercase text-white bg-red px-3 py-0.5 inline-block rounded-full absolute top-3 left-3 z-[1]">
-                                    Sale
-                                </div>
-                            )}
-                            {style === 'style-1' || style === 'style-3' || style === 'style-4' ? (
+                        <div onClick={() => handleDetailProduct(data.id)} className="product-main cursor-pointer block">
+                            <div className="product-thumb bg-white relative overflow-hidden rounded-2xl">
+                                {/* Product Tags */}
+
+                                {(data.new || (data as any).newArrivals) && (
+                                    <div className="product-tag text-button-uppercase text-white bg-green px-3 py-0.5 inline-block rounded-full absolute top-3 right-3 z-[1]">
+                                        New
+                                    </div>
+                                )}
+
+
+                                {style === 'style-1' || style === 'style-3' || style === 'style-4' ? (
                                 <div className="list-action-right absolute top-3 right-3 max-lg:hidden">
                                     {style === 'style-4' && (
                                         <div
@@ -222,22 +230,6 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                                     </>
                                 )}
                             </div>
-                            {data.sale && percentSale > 0 && (
-                                <>
-                                    <Marquee className='banner-sale-auto bg-black absolute bottom-0 left-0 w-full py-1.5'>
-                                        <div className={`caption2 font-semibold uppercase text-white px-2.5`}>Hot Sale {percentSale}% OFF</div>
-                                        <Icon.Lightning weight='fill' className='text-red' />
-                                        <div className={`caption2 font-semibold uppercase text-white px-2.5`}>Hot Sale {percentSale}% OFF</div>
-                                        <Icon.Lightning weight='fill' className='text-red' />
-                                        <div className={`caption2 font-semibold uppercase text-white px-2.5`}>Hot Sale {percentSale}% OFF</div>
-                                        <Icon.Lightning weight='fill' className='text-red' />
-                                        <div className={`caption2 font-semibold uppercase text-white px-2.5`}>Hot Sale {percentSale}% OFF</div>
-                                        <Icon.Lightning weight='fill' className='text-red' />
-                                        <div className={`caption2 font-semibold uppercase text-white px-2.5`}>Hot Sale {percentSale}% OFF</div>
-                                        <Icon.Lightning weight='fill' className='text-red' />
-                                    </Marquee>
-                                </>
-                            )}
                             {style === 'style-2' || style === 'style-4' ? (
                                 <div className="list-size-block flex items-center justify-center gap-4 absolute bottom-0 left-0 w-full h-8">
                                     {data.sizes.map((item, index) => (
@@ -473,14 +465,7 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                             )}
                             <div className="product-price-block flex items-center gap-2 flex-wrap mt-1 duration-300 relative z-[1]">
                                 <div className="product-price text-title">₹{displayPrice}.00</div>
-                                {percentSale > 0 && (
-                                    <>
-                                        <div className="product-origin-price caption1 text-secondary2"><del>₹{data.originPrice}.00</del></div>
-                                        <div className="product-sale caption1 font-medium bg-green px-3 py-0.5 inline-block rounded-full">
-                                            -{percentSale}%
-                                        </div>
-                                    </>
-                                )}
+
                             </div>
 
                             {style === 'style-5' &&
@@ -518,16 +503,14 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                             <div className="product-item list-type">
                                 <div className="product-main cursor-pointer flex lg:items-center sm:justify-between gap-7 max-lg:gap-5">
                                     <div onClick={() => handleDetailProduct(data.id)} className="product-thumb bg-white relative overflow-hidden rounded-2xl block max-sm:w-1/2">
-                                        {data.new && (
-                                            <div className="product-tag text-button-uppercase bg-green px-3 py-0.5 inline-block rounded-full absolute top-3 left-3 z-[1]">
+
+                                        
+                                        {(data.new || (data as any).newArrivals) && (
+                                            <div className="product-tag text-button-uppercase text-white bg-green px-3 py-0.5 inline-block rounded-full absolute top-3 right-3 z-[1]">
                                                 New
                                             </div>
                                         )}
-                                        {data.sale && (
-                                            <div className="product-tag text-button-uppercase text-white bg-red px-3 py-0.5 inline-block rounded-full absolute top-3 left-3 z-[1]">
-                                                Sale
-                                            </div>
-                                        )}
+                                        
                                         <div className="product-img w-full aspect-[3/4] rounded-2xl overflow-hidden">
                                              {(data.thumbImage || [data.images?.[0]]).map((img, index) => (
                                                 <Image

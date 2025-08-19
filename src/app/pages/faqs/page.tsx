@@ -7,6 +7,9 @@ import Footer from '@/components/Footer/Footer'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
 import { ref, get } from 'firebase/database'
 import { database } from '@/firebase/config'
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
+import BannerTop from '@/components/Home3/BannerTop'
 
 interface FaqItem {
     id: string

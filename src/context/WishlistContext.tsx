@@ -74,7 +74,15 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString(),
                         sku: item.id,
-                        slug: item.slug || item.name.toLowerCase().replace(/\s+/g, '-')
+                        slug: item.slug || item.name.toLowerCase().replace(/\s+/g, '-'),
+                        vendor: 'admin',
+                        inventoryType: 'simple',
+                        new: false,
+                        bestSeller: false,
+                        onSale: false,
+                        newArrivals: false,
+                        trending: false,
+                        featured: false
                     };
                     await addToFirebaseWishlist(user.uid, fb);
                 } catch {}

@@ -9,15 +9,23 @@ import Newsletter from '@/components/Home4/Newsletter'
 import Instagram from '@/components/Home6/Instagram'
 import Brand from '@/components/Home1/Brand'
 import Footer from '@/components/Footer/Footer'
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
+import BannerTop from '@/components/Home3/BannerTop'
+
 
 const AboutUs = () => {
     return (
         <>
-            <TopNavOne props="style-one bg-black" slogan="New customers save 10% with the code GET10" />
+          
             <div id="header" className='relative w-full'>
-                <MenuOne props="bg-transparent" />
-                <Breadcrumb heading='About Us' subHeading='About Us' />
-            </div>
+        <BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+         <MenuFurniture props="bg-white" />
+         <MenuCategory />
+         <Breadcrumb heading='About Us' subHeading='About Us' />
+         </div>
+
+
             <div className='about md:pt-20 pt-10'>
                 <div className="about-us-block">
                     <div className="container">

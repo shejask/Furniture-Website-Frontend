@@ -5,11 +5,17 @@ interface Variation {
     image: string;
 }
 
+interface VariableOption {
+    name: string;
+    values: string[];
+}
+
 // ProductType interface with all required properties including Firebase fields
 
 export interface ProductType {
     id: string,
     category: string,
+    categories?: string[], // Firebase categories array
     type: string,
     name: string,
     gender: string,
@@ -20,6 +26,7 @@ export interface ProductType {
     salePrice?: number,
     originPrice: number,
     brand: string,
+    brands?: string[], // Firebase brands array
     sold: number,
     quantity: number,
     quantityPurchase: number,
@@ -38,7 +45,18 @@ export interface ProductType {
     encourageOrder?: boolean,
     encourageView?: boolean,
     createdAt?: string,
-    updatedAt?: string
+    updatedAt?: string,
+    // New Firebase fields
+    variableOptions?: VariableOption[],
+    weight?: number,
+    dimensions?: string,
+    roomType?: string,
+    warrantyTime?: string,
+    bestSeller?: boolean,
+    onSale?: boolean,
+    newArrivals?: boolean,
+    trending?: boolean,
+    status?: string // Add status field for filtering
 }
 
 export interface ReviewType {
@@ -61,11 +79,10 @@ export interface BannerType {
     createdAt: string;
     description: string;
     displayOrder: number;
-    endDate: string;
+    endDate?: string;
     imageUrl: string;
-    isActive: boolean;
     linkUrl: string;
-    startDate: string;
+    startDate?: string;
     title: string;
     updatedAt: string;
 }

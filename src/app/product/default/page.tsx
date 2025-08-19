@@ -7,8 +7,8 @@ export async function generateMetadata({ searchParams }: { searchParams: { id: s
     try {
         if (!searchParams.id) {
             return {
-                title: 'Anvogue',
-                description: 'Multipurpose eCommerce Template',
+                title: 'Oak and Aura',
+                description: 'Furniture eCommerce ',
             }
         }
 
