@@ -69,49 +69,9 @@ const ModalCart = () => {
                     className={`modal-cart-main flex ${isModalOpen ? 'open' : ''}`}
                     onClick={(e) => { e.stopPropagation() }}
                 >
-                    <div className="left w-1/2 border-r border-line py-6 max-md:hidden">
-                        <div className="heading5 px-6 pb-3">You May Also Like</div>
-                        <div className="list px-6">
-                            {productData.slice(0, 4).map((product) => {
-                                // Add defensive checks for product properties
-                                const safeImage = product?.images && Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : '/images/other/404-img.png';
-                                
-                                return (
-                                    <div key={product.id} className='item py-5 flex items-center justify-between gap-3 border-b border-line'>
-                                        <div className="infor flex items-center gap-5">
-                                            <div className="bg-img">
-                                                <Image
-                                                    src={safeImage}
-                                                    width={300}
-                                                    height={300}
-                                                    alt={product.name || 'Product'}
-                                                    className='w-[100px] aspect-square flex-shrink-0 rounded-lg'
-                                                />
-                                            </div>
-                                            <div className=''>
-                                                <div className="name text-button">{product.name || 'Unnamed Product'}</div>
-                                                <div className="flex items-center gap-2 mt-2">
-                                                <div className="product-price text-title">₹{product.price || 0}.00</div>
-                                                <div className="product-origin-price text-title text-secondary2"><del>₹{product.originPrice || 0}.00</del></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div
-                                            className="text-xl bg-white w-10 h-10 rounded-xl border border-black flex items-center justify-center duration-300 cursor-pointer hover:bg-black hover:text-white"
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                handleAddToCart(product)
-                                            }}
-                                        >
-                                            <Icon.Handbag />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    <div className="right cart-block md:w-1/2 w-full py-6 relative overflow-hidden">
-                        <div className="heading px-6 pb-3 flex items-center justify-between relative">
+                    
+                    <div className="right cart-block md:w-full w-full py-6 relative overflow-hidden">
+                        <div className="heading px-6 pb-3 flex items-center justify- relative">
                             <div className="heading5">Shopping Cart</div>
                             <div
                                 className="close-btn absolute right-6 top-0 w-6 h-6 rounded-full bg-surface flex items-center justify-center duration-300 cursor-pointer hover:bg-black hover:text-white"
