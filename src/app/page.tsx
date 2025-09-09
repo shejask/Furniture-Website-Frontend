@@ -1,0 +1,47 @@
+import React from 'react'
+import TopNavThree from '@/components/Header/TopNav/TopNavThree'
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
+import SliderFurniture from '@/components/Slider/SliderFurniture'
+import BannerTop from '@/components/Home3/BannerTop'
+import Banner from '@/components/Furniture/Banner'
+
+import FeatureProduct from '@/components/Furniture/FeatureProduct'
+import FlashSale from '@/components/Furniture/FlashSale'
+import TabFeatures from '@/components/Furniture/TabFeatures'
+import Benefit from '@/components/Home1/Benefit'
+import dataTestimonial from '@/data/Testimonial.json'
+import Testimonial from '@/components/Furniture/Testimonial'
+import Instagram from '@/components/Furniture/Instagram'
+import Brand from '@/components/Home1/Brand'
+import Footer from '@/components/Footer/Footer'
+import ModalNewsletter from '@/components/Modal/ModalNewsletter'
+import CategoriesGrid from '@/components/Furniture/CategoriesGrid'
+ 
+export default function Home() {
+  return (
+    <>
+        {/* <TopNavThree props="style-three bg-white" /> */}
+        <div id="header" className='relative w-full'>
+        <BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+         <MenuFurniture props="bg-white" />
+         <MenuCategory />
+         <SliderFurniture />
+        </div>
+
+
+        
+
+         <CategoriesGrid />
+        <FeatureProduct start={0} limit={4} />
+        <FlashSale />
+        <TabFeatures start={0} limit={8} />
+        <Banner />
+        <Testimonial   limit={4} />
+        <Instagram />
+        <Brand />
+        <Footer />
+        {/* <ModalNewsletter /> */}
+     </>
+)
+}
