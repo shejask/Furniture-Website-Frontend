@@ -144,20 +144,13 @@ const ModalCart = () => {
                                 <div className="heading5">₹{totalCart}.00</div>
                             </div>
                             <div className="block-button text-center p-6">
-                                <div className="flex items-center gap-4">
+                                <div className="w-full">
                                     <Link
                                         href={'/cart'}
-                                        className='button-main basis-1/2 bg-white border border-black text-black text-center uppercase'
+                                        className='button-main bg-black text-white text-center uppercase w-full block py-4'
                                         onClick={closeModalCart}
                                     >
                                         View cart
-                                    </Link>
-                                    <Link
-                                        href={'/checkout'}
-                                        className='button-main basis-1/2 text-center uppercase'
-                                        onClick={closeModalCart}
-                                    >
-                                        Check Out
                                     </Link>
                                 </div>
                                 <div onClick={closeModalCart} className="text-button-uppercase mt-4 text-center has-line-before cursor-pointer inline-block">Or continue shopping</div>

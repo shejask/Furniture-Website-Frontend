@@ -6,6 +6,10 @@ import TopNavOne from '@/components/Header/TopNav/TopNavOne'
 import MenuOne from '@/components/Header/Menu/MenuOne'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb'
 import Footer from '@/components/Footer/Footer'
+import BannerTop from '@/components/Home3/BannerTop'
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
+import SliderFurniture from '@/components/Slider/SliderFurniture'
 import * as Icon from "@phosphor-icons/react/dist/ssr"
 
 const PaymentSuccess = () => {
@@ -24,11 +28,11 @@ const PaymentSuccess = () => {
 
     return (
         <>
-            <TopNavOne props="style-one bg-black" slogan="New customers save 10% with the code GET10" />
             <div id="header" className='relative w-full'>
-                <MenuOne props="bg-transparent" />
-                <Breadcrumb heading='Payment Success' subHeading='Payment Success' />
-            </div>
+        <BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+         <MenuFurniture props="bg-white" />
+         <MenuCategory />
+         </div>
             
             <div className="payment-success md:py-20 py-10">
                 <div className="container">
@@ -68,11 +72,8 @@ const PaymentSuccess = () => {
                             </div>
                         )}
                         
-                        <div className="actions flex flex-col sm:flex-row gap-4">
-                            <Link href="/order-tracking" className="button-main">
-                                Track Your Order
-                            </Link>
-                            <Link href="/shop/breadcrumb1" className="button-main bg-white text-black border border-line hover:bg-black hover:text-white">
+                        <div className="actions flex justify-center">
+                            <Link href="/shop/breadcrumb1" className="button-main">
                                 Continue Shopping
                             </Link>
                         </div>

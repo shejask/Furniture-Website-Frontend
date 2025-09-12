@@ -11,7 +11,7 @@ import MenuCategory from '@/components/Furniture/MenuCategory'
 import BannerTop from '@/components/Home3/BannerTop'
 import { useAuthState } from 'react-firebase-hooks/auth'
 import { auth } from '@/firebase/config'
-import { getCustomerOrders, Order } from '@/firebase/orders'
+import { getCustomerOrders, Order, updateOrderStatus } from '@/firebase/orders'
 
 interface Address {
     id: string
@@ -50,6 +50,9 @@ const MyAccount = () => {
     const [orders, setOrders] = useState<Order[]>([])
     const [ordersLoading, setOrdersLoading] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+    const [cancellingOrder, setCancellingOrder] = useState(false)
+    const [showCancelPopup, setShowCancelPopup] = useState(false)
+    const [orderToCancel, setOrderToCancel] = useState<string | null>(null)
     
     // Form state for address
     const [formData, setFormData] = useState({
@@ -63,6 +66,50 @@ const MyAccount = () => {
         zip: '',
         phone: ''
     })
+
+    const handleCancelOrder = (orderId: string) => {
+        setOrderToCancel(orderId)
+        setShowCancelPopup(true)
+    }
+
+    const confirmCancelOrder = async () => {
+        if (!orderToCancel) return
+
+        setCancellingOrder(true)
+        setShowCancelPopup(false)
+        
+        try {
+            // Update order status to cancelled
+            await updateOrderStatus(orderToCancel, 'cancelled')
+            
+            // Update local orders state
+            setOrders(prevOrders => 
+                prevOrders.map(order => 
+                    order.orderId === orderToCancel 
+                        ? { ...order, orderStatus: 'cancelled' as const }
+                        : order
+                )
+            )
+            
+            // Update selected order if it's the one being cancelled
+            if (selectedOrder && selectedOrder.orderId === orderToCancel) {
+                setSelectedOrder(prev => prev ? { ...prev, orderStatus: 'cancelled' as const } : null)
+            }
+            
+            // Order cancelled successfully
+        } catch (error) {
+            console.error('Error cancelling order:', error)
+            // Failed to cancel order
+        } finally {
+            setCancellingOrder(false)
+            setOrderToCancel(null)
+        }
+    }
+
+    const cancelCancelOrder = () => {
+        setShowCancelPopup(false)
+        setOrderToCancel(null)
+    }
 
     const fetchAddresses = useCallback(async () => {
         if (!user) return
@@ -168,7 +215,7 @@ const MyAccount = () => {
                         ? { ...formData, id: editingAddress.id }
                         : addr
                 ))
-                alert('Address updated successfully!')
+                // Address updated successfully
             } else {
                 // Add new address
                 const newAddressId = Date.now().toString()
@@ -177,13 +224,12 @@ const MyAccount = () => {
                 
                 // Update local state
                 setAddresses(prev => [...prev, { ...formData, id: newAddressId }])
-                alert('Address added successfully!')
             }
 
             closeForm()
         } catch (error) {
             console.error('Error saving address:', error)
-            alert('Failed to save address. Please try again.')
+            // Failed to save address
         }
     }
 
@@ -198,10 +244,10 @@ const MyAccount = () => {
             
             // Update local state
             setAddresses(prev => prev.filter(a => a.id !== addressId))
-            alert('Address deleted successfully!')
+            // Address deleted successfully
         } catch (error) {
             console.error('Error deleting address:', error)
-            alert('Failed to delete address. Please try again.')
+            // Failed to delete address
         }
     }
 
@@ -427,11 +473,13 @@ const MyAccount = () => {
                                                     </div>
                                                     <div>
                                                                         <div className="prd_name text-title">{item.name}</div>
-                                                        <div className="caption1 text-secondary mt-2">
-                                                                            <span className="prd_size uppercase">{item.selectedSize || 'N/A'}</span>
-                                                            <span>/</span>
-                                                                            <span className="prd_color capitalize">{item.selectedColor || 'N/A'}</span>
-                                                                        </div>
+                                                        {(item.selectedSize || item.selectedColor) && (
+                                                            <div className="caption1 text-secondary mt-2">
+                                                                {item.selectedSize && <span className="prd_size uppercase">{item.selectedSize}</span>}
+                                                                {item.selectedSize && item.selectedColor && <span>/</span>}
+                                                                {item.selectedColor && <span className="prd_color capitalize">{item.selectedColor}</span>}
+                                                            </div>
+                                                        )}
                                                                     </div>
                                                                 </div>
                                                                 <div className='text-title'>
@@ -445,11 +493,18 @@ const MyAccount = () => {
                                                     <div className="flex flex-wrap gap-4 p-5">
                                                         <div className="flex-1">
                                                             <div className="text-sm text-secondary mb-2">
-                                                                <strong>Total: ₹{order.total}.00</strong>
+                                                                <strong>Order Date: {new Date(order.createdAt).toLocaleDateString('en-US', {
+                                                                    year: 'numeric',
+                                                                    month: 'long',
+                                                                    day: 'numeric'
+                                                                })}</strong>
                                                             </div>
                                                             <div className="text-xs text-secondary">
-                                                                Payment: {order.paymentMethod === 'razorpay' ? 'Razorpay' : 'Cash on Delivery'} 
-                                                                ({order.paymentStatus})
+                                                                Time: {new Date(order.createdAt).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    hour12: true
+                                                                })}
                                                             </div>
                                                         </div>
                                                         <div className="flex gap-2">
@@ -459,11 +514,6 @@ const MyAccount = () => {
                                                             }}>
                                                                 Order Details
                                                             </button>
-                                                            {order.orderStatus === 'pending' && (
-                                                                <button className="button-main bg-surface border border-line hover:bg-red text-red hover:text-white">
-                                                                    Cancel Order
-                                                                </button>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -710,10 +760,10 @@ const MyAccount = () => {
                                             };
                                         });
 
-                                        alert('Profile updated successfully!');
+                                        // Profile updated successfully
                                     } catch (error) {
                                         console.error('Error updating profile:', error);
-                                        alert('Failed to update profile. Please try again.');
+                                        // Failed to update profile
                                     }
                                 }}>
                                     <div className="heading5 pb-4">Information</div>
@@ -789,12 +839,43 @@ const MyAccount = () => {
                                 </div>
                                 <div className="info_item">
                                     <strong className="text-button-uppercase text-secondary">Order Status</strong>
-                                    <h6 className="heading6 order_status mt-2 capitalize">{selectedOrder.orderStatus}</h6>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <h6 className="heading6 order_status capitalize">{selectedOrder.orderStatus}</h6>
+                                        {selectedOrder.orderStatus === 'pending' && (
+                                            <button 
+                                                className="button-main bg-red text-white hover:bg-red/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                onClick={() => handleCancelOrder(selectedOrder.orderId)}
+                                                disabled={cancellingOrder}
+                                            >
+                                                {cancellingOrder ? 'Cancelling...' : 'Cancel Order'}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                                 {selectedOrder.couponCode && (
                                     <div className="info_item">
                                         <strong className="text-button-uppercase text-secondary">Coupon Code</strong>
                                         <h6 className="heading6 order_coupon mt-2">{selectedOrder.couponCode}</h6>
+                                    </div>
+                                )}
+                                {selectedOrder.orderStatus === 'confirmed' && selectedOrder.shiprocketOrderId && (
+                                    <div className="info_item">
+                                        <strong className="text-button-uppercase text-secondary">Shiprocket Tracking</strong>
+                                        <h6 className="heading6 shiprocket_order mt-2">Order ID: {selectedOrder.shiprocketOrderId}</h6>
+                                        {selectedOrder.shiprocketShipmentId && (
+                                            <h6 className="heading6 shiprocket_shipment mt-1">Shipment ID: {selectedOrder.shiprocketShipmentId}</h6>
+                                        )}
+                                        <div className="mt-3">
+                                            <a 
+                                                href="https://www.shiprocket.in/shipment-tracking/"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-black hover:underline text-xs font-medium border border-gray-300 px-2 py-1 rounded"
+                                            >
+                                                <Icon.Truck size={12} />
+                                                Track Package →
+                                            </a>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -817,11 +898,13 @@ const MyAccount = () => {
                                         </div>
                                         <div>
                                             <div className="prd_name text-title">{item.name}</div>
-                                            <div className="caption1 text-secondary mt-2">
-                                                <span className="prd_size uppercase">{item.selectedSize || 'N/A'}</span>
-                                                <span>/</span>
-                                                <span className="prd_color capitalize">{item.selectedColor || 'N/A'}</span>
-                                            </div>
+                                            {(item.selectedSize || item.selectedColor) && (
+                                                <div className="caption1 text-secondary mt-2">
+                                                    {item.selectedSize && <span className="prd_size uppercase">{item.selectedSize}</span>}
+                                                    {item.selectedSize && item.selectedColor && <span>/</span>}
+                                                    {item.selectedColor && <span className="prd_color capitalize">{item.selectedColor}</span>}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className='text-title'>
@@ -857,6 +940,41 @@ const MyAccount = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Cancel Order Confirmation Popup */}
+            {showCancelPopup && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                        <div className="flex items-center mb-4">
+                            <div className="w-10 h-10 bg-red/10 rounded-full flex items-center justify-center mr-3">
+                                <Icon.Warning className="text-red text-xl" />
+                            </div>
+                            <h3 className="heading6 text-title">Cancel Order</h3>
+                        </div>
+                        
+                        <p className="text-secondary mb-6">
+                            Are you sure you want to cancel this order? This action cannot be undone.
+                        </p>
+                        
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={cancelCancelOrder}
+                                className="button-main bg-white border border-line text-black hover:bg-gray-100"
+                                disabled={cancellingOrder}
+                            >
+                                Keep Order
+                            </button>
+                            <button
+                                onClick={confirmCancelOrder}
+                                className="button-main bg-red text-white hover:bg-red/90"
+                                disabled={cancellingOrder}
+                            >
+                                {cancellingOrder ? 'Cancelling...' : 'Yes, Cancel Order'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

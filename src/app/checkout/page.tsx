@@ -67,6 +67,7 @@ const Checkout = () => {
     const [showAddressForm, setShowAddressForm] = useState<boolean>(false)
     const [saveAddress, setSaveAddress] = useState<boolean>(true)
     const [orderNote, setOrderNote] = useState<string>('')
+    const [message, setMessage] = useState<{type: 'success' | 'error' | 'info', text: string} | null>(null)
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -77,6 +78,12 @@ const Checkout = () => {
         state: '',
         zip: '',
     })
+
+    // Helper function to show messages
+    const showMessage = (type: 'success' | 'error' | 'info', text: string) => {
+        setMessage({ type, text })
+        setTimeout(() => setMessage(null), 5000) // Auto-hide after 5 seconds
+    }
 
     // Update email when user changes
     React.useEffect(() => {
@@ -109,10 +116,8 @@ const Checkout = () => {
                 setSelectedAddress(defaultAddr)
                 populateFormWithAddress(defaultAddr)
             }
-        } else if (addresses.length === 0 && !addressLoading && user && !showAddressForm) {
-            // If user has no addresses and we're not loading, show the address form
-            setShowAddressForm(true)
         }
+        // Removed automatic form display - now always show address list by default
     }, [addresses, selectedAddress, showAddressForm, addressLoading, user, getDefaultAddress, populateFormWithAddress])
 
     const handleAddressSelect = (address: Address) => {
@@ -146,12 +151,12 @@ const Checkout = () => {
 
     const handleSaveAddressOnly = async () => {
         if (!user) {
-            alert('Please log in to save addresses')
+            showMessage('error', 'Please log in to save addresses')
             return
         }
 
         if (!formData.firstName || !formData.lastName || !formData.phone || !formData.streetAddress || !formData.city || !formData.state || !formData.zip) {
-            alert('Please fill in all required fields')
+            showMessage('error', 'Please fill in all required fields')
             return
         }
 
@@ -171,11 +176,11 @@ const Checkout = () => {
                 });
 
                 if (success) {
-                    alert('Address updated successfully!')
+                    showMessage('success', 'Address updated successfully!')
                     setShowAddressForm(false)
                     await refreshAddresses() // Refresh the address list
                 } else {
-                    alert('Failed to update address. Please try again.')
+                    showMessage('error', 'Failed to update address. Please try again.')
                 }
             } else {
                 // Create new address
@@ -193,7 +198,7 @@ const Checkout = () => {
                 });
                 
                 if (newAddressId) {
-                    alert('Address saved successfully!')
+                    showMessage('success', 'Address saved successfully!')
                     setShowAddressForm(false)
                     
                     // Create a temporary address object to set as selected
@@ -217,7 +222,7 @@ const Checkout = () => {
         } catch (error) {
             console.error('Error saving/updating address:', error)
             console.error('Error details:', error)
-            alert(`Failed to save/update address. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            showMessage('error', `Failed to save/update address. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
     }
 
@@ -341,7 +346,7 @@ const Checkout = () => {
 
     const handleRazorpayPayment = async () => {
         if (!formData.firstName || !formData.lastName || !formData.phone) {
-            alert('Please fill in all required address fields')
+            showMessage('error', 'Please fill in all required address fields')
             return
         }
 
@@ -375,7 +380,7 @@ const Checkout = () => {
                     console.error('Error saving order:', error);
                     console.error('Error details:', error);
                     console.error('Order data that failed:', orderData);
-                    alert(`Payment successful but failed to save order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please contact support with order ID: ${response.razorpay_order_id}`);
+                    showMessage('error', `Payment successful but failed to save order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please contact support with order ID: ${response.razorpay_order_id}`);
                     clearCart()
                     router.push(`/payment/success?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&amount=${finalAmount}`)
                 }
@@ -392,7 +397,7 @@ const Checkout = () => {
         
         // Validate required fields before proceeding
         if (!formData.firstName || !formData.lastName || !formData.phone || !formData.streetAddress || !formData.city || !formData.state || !formData.zip) {
-            alert('Please fill in all required address fields')
+            showMessage('error', 'Please fill in all required address fields')
             return
         }
 
@@ -414,7 +419,7 @@ const Checkout = () => {
                     });
 
                     if (!success) {
-                        alert('Failed to update address. Please try again.')
+                        showMessage('error', 'Failed to update address. Please try again.')
                         return
                     }
                 } else {
@@ -433,7 +438,7 @@ const Checkout = () => {
                     });
                     
                     if (!newAddressId) {
-                        alert('Failed to save address. Please try again.')
+                        showMessage('error', 'Failed to save address. Please try again.')
                         return
                     }
 
@@ -460,7 +465,7 @@ const Checkout = () => {
             } catch (error) {
                 console.error('Error saving/updating address:', error)
                 console.error('Error details:', error)
-                alert(`Failed to save/update address. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                showMessage('error', `Failed to save/update address. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
                 return
             }
         }
@@ -479,17 +484,17 @@ const Checkout = () => {
                 const savedOrderId = await saveOrder(orderData);
                 console.log('COD order saved successfully with ID:', savedOrderId);
                 
-                alert('COD order placed successfully!')
+                showMessage('success', 'COD order placed successfully!')
                 clearCart()
                 router.push(`/order-tracking?order_id=${orderData.orderId}`)
             } catch (error) {
                 console.error('Error saving COD order:', error);
                 console.error('Error details:', error);
                 console.error('Order data that failed:', orderData);
-                alert(`Failed to save COD order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+                showMessage('error', `Failed to save COD order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
             }
         } else {
-            alert('This payment method is not yet implemented')
+            showMessage('info', 'This payment method is not yet implemented')
         }
     }
 
@@ -528,9 +533,27 @@ const Checkout = () => {
             
             <div className="cart-block md:py-20 py-10">
                 <div className="container">
-                    <div className="content-main flex justify-between max-xl:flex-col gap-y-8">
+                            <div className="content-main flex justify-between max-xl:flex-col gap-y-8">
                         <div className="xl:w-2/3 xl:pr-3 w-full">
                             
+                            {/* Message Display */}
+                            {message && (
+                                <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md ${
+                                    message.type === 'success' ? 'bg-green text-white' :
+                                    message.type === 'error' ? 'bg-red text-white' :
+                                    'bg-blue text-white'
+                                }`}>
+                                    <div className="flex items-center justify-between">
+                                        <span>{message.text}</span>
+                                        <button 
+                                            onClick={() => setMessage(null)}
+                                            className="ml-4 text-white hover:text-gray-200"
+                                        >
+                                            <Icon.X size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             
                             {/* Address Section */}
                             <div className="address-section mt-5">
@@ -611,13 +634,13 @@ const Checkout = () => {
                                                                             try {
                                                                                 const success = await makeDefault(address.id!);
                                                                                 if (success) {
-                                                                                    alert('Address set as default');
+                                                                                    showMessage('success', 'Address set as default');
                                                                                 } else {
-                                                                                    alert('Failed to set as default. Please try again.');
+                                                                                    showMessage('error', 'Failed to set as default. Please try again.');
                                                                                 }
                                                                             } catch (error) {
                                                                                 console.error('Error setting default address:', error);
-                                                                                alert('Failed to set as default. Please try again.');
+                                                                                showMessage('error', 'Failed to set as default. Please try again.');
                                                                             }
                                                                         }}
                                                                         className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
@@ -645,8 +668,23 @@ const Checkout = () => {
                                             </button>
                                         </div>
                                     </div>
-                                ) : user && !addressLoading ? (
-                                    /* Address Form - shown when no addresses or when creating new address */
+                                ) : user && !addressLoading && addresses.length === 0 ? (
+                                    /* No addresses - show empty state with add button */
+                                    <div className="no-addresses mt-4">
+                                        <div className="text-center py-8">
+                                            <div className="text-secondary mb-4">No saved addresses found.</div>
+                                            <button
+                                                type="button"
+                                                onClick={handleNewAddress}
+                                                className="w-full bg-green text-white py-3 px-4 rounded-lg font-medium hover:bg-green/90 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <Icon.Plus size={20} />
+                                                Add Your First Address
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : user && !addressLoading && showAddressForm ? (
+                                    /* Address Form - shown when creating new address or editing */
                                     <div className="new-address mt-4">
                                         {addresses.length > 0 && (
                                             <button
@@ -659,7 +697,7 @@ const Checkout = () => {
                                         )}
                                         
                                         {addresses.length === 0 && (
-                                            <p className="text-secondary text-sm mb-4">No saved addresses found. Please add your address below.</p>
+                                            <p className="text-secondary text-sm mb-4">Please add your address below.</p>
                                         )}
                                         
                                         {/* Address Form */}
@@ -875,11 +913,13 @@ const Checkout = () => {
                                                     <div className="flex items-center justify-between w-full">
                                                         <div>
                                                             <div className="name text-title">{product.name}</div>
-                                                            <div className="caption1 text-secondary mt-2">
-                                                            <span className='size capitalize'>{product.selectedSize || (product.sizes && product.sizes[0]) || 'N/A'}</span>
-                                                                <span>/</span>
-                                                            <span className='color capitalize'>{product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color) || 'N/A'}</span>
-                                                            </div>
+                                                            {(product.selectedSize || (product.sizes && product.sizes[0]) || product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)) && (
+                                                                <div className="caption1 text-secondary mt-2">
+                                                                    {(product.selectedSize || (product.sizes && product.sizes[0])) && <span className='size capitalize'>{product.selectedSize || (product.sizes && product.sizes[0])}</span>}
+                                                                    {(product.selectedSize || (product.sizes && product.sizes[0])) && (product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)) && <span>/</span>}
+                                                                    {(product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)) && <span className='color capitalize'>{product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)}</span>}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="text-title">
                                                             <span className='quantity'>{product.quantity}</span>
