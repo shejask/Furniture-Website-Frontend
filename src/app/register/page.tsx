@@ -186,7 +186,7 @@ const Register = () => {
                                         <Icon.CheckSquare size={20} weight='fill' className='icon-checkbox' />
                                     </div>
                                     <label htmlFor='agreeToTerms' className="pl-2 cursor-pointer text-secondary2">I agree to the
-                                        <Link href={'#!'} className='text-black hover:underline pl-1'>Terms of User</Link>
+                                        <Link href={'/terms-and-conditions'} className='text-black hover:underline pl-1'>Terms of User</Link>
                                     </label>
                                 </div>
                                 {error && (

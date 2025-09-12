@@ -27,6 +27,11 @@ export interface ProductType {
     originPrice: number,
     brand: string,
     brands?: string[], // Firebase brands array
+    vendor?: string, // Firebase vendor field
+    subCategory?: string, // Firebase subcategory field
+    subCategories?: string[], // Firebase subcategories array
+    style?: string[], // Firebase style array
+    primaryMaterial?: string[], // Firebase primary material array
     sold: number,
     quantity: number,
     quantityPurchase: number,

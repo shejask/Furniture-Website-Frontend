@@ -15,9 +15,10 @@ import { useModalSearchContext } from '@/context/ModalSearchContext';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation'
 import { ref, get } from 'firebase/database'
-import { database } from '@/firebase/config'
+import { database, auth } from '@/firebase/config'
 import { FirebaseProductType, convertFirebaseToUIProduct } from '@/type/FirebaseProductType'
 import { ProductType } from '@/type/ProductType'
+import { useAuthState } from 'react-firebase-hooks/auth'
 
 interface Props {
     props: string
@@ -39,9 +40,9 @@ const MenuFurniture: React.FC<Props> = ({ props }) => {
     const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false)
     const router = useRouter()
     
-    // Authentication state
-    const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false)
-    const [user, setUser] = useState<any>(null)
+    // Firebase Authentication state
+    const [user, loading, authError] = useAuthState(auth)
+    const isLoggedIn = !!user
 
     const handleSearch = (value: string) => {
         const query = (value || '').trim()
@@ -63,52 +64,30 @@ const MenuFurniture: React.FC<Props> = ({ props }) => {
         } catch {}
     }, [])
 
-    // Check authentication status on component mount
+    // Load recent searches from localStorage
     useEffect(() => {
-        const checkAuthStatus = () => {
-            const userStr = localStorage.getItem('user')
-            if (userStr) {
-                try {
-                    const userData = JSON.parse(userStr)
-                    setUser(userData)
-                    setIsLoggedIn(true)
-                } catch (error) {
-                    console.error('Error parsing user data:', error)
-                    setIsLoggedIn(false)
-                    setUser(null)
-                }
-            } else {
-                setIsLoggedIn(false)
-                setUser(null)
+        const saved = localStorage.getItem('recentSearches')
+        if (saved) {
+            try {
+                setRecentSearches(JSON.parse(saved))
+            } catch (error) {
+                console.error('Error parsing recent searches:', error)
             }
-        }
-
-        checkAuthStatus()
-        
-        // Listen for storage changes (when user logs in/out in other tabs)
-        const handleStorageChange = (e: StorageEvent) => {
-            if (e.key === 'user') {
-                checkAuthStatus()
-            }
-        }
-
-        window.addEventListener('storage', handleStorageChange)
-        
-        return () => {
-            window.removeEventListener('storage', handleStorageChange)
         }
     }, [])
 
-    const handleLogout = () => {
-        localStorage.removeItem('user')
-        setIsLoggedIn(false)
-        setUser(null)
-        // Close the popup if it's open
-        if (openLoginPopup) {
-            handleLoginPopup()
+    const handleLogout = async () => {
+        try {
+            await auth.signOut()
+            // Close the popup if it's open
+            if (openLoginPopup) {
+                handleLoginPopup()
+            }
+            // Redirect to home page
+            router.push('/')
+        } catch (error) {
+            console.error('Error signing out:', error)
         }
-        // Redirect to home page
-        router.push('/')
     }
 
     useEffect(() => {

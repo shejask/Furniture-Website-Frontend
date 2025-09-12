@@ -44,6 +44,7 @@ interface FirebaseProductType {
     tags: string[];
     trending: boolean;
     unit: string;
+    vendor?: string; // Add vendor field
     // New Firebase fields for specifications
     variableOptions?: Array<{
         name: string;
@@ -135,6 +136,7 @@ const ProductClient = ({ productId }: { productId: string | null }) => {
             new: false,
             brand: product.brands?.[0] || '',
             brands: product.brands, // Include the full brands array
+            vendor: product.vendor, // Include vendor information
             sold: 0,
             sizes: Array.isArray(product.attributes?.sizes) ? product.attributes.sizes : ['S', 'M', 'L', 'XL'],
             variation: Array.isArray(product.attributes?.variations) ? product.attributes.variations : [],

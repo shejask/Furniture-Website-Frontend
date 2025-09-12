@@ -21,13 +21,31 @@ export default function BreadCrumb1() {
     let gender = searchParams.get('gender')
     let category = searchParams.get('category')
     let categoryId = searchParams.get('categoryId')
+    let vendorId = searchParams.get('vendorId')
     const [products, setProducts] = useState<ProductType[]>([])
     const [loading, setLoading] = useState<boolean>(true)
     const [error, setError] = useState<string | null>(null)
+    const [vendorName, setVendorName] = useState<string>('Vendor')
 
     useEffect(() => {
         setType(datatype);
     }, [datatype]);
+
+    const fetchVendorData = async (vendorId: string) => {
+        try {
+            const vendorRef = ref(database, `vendors/${vendorId}`)
+            const snapshot = await get(vendorRef)
+            if (snapshot.exists()) {
+                const vendorData = snapshot.val()
+                setVendorName(vendorData.storeName || vendorData.name || 'Vendor')
+            } else {
+                setVendorName('Vendor')
+            }
+        } catch (error) {
+            console.error('Error fetching vendor:', error)
+            setVendorName('Vendor')
+        }
+    }
     
     useEffect(() => {
         const fetchProducts = async () => {
@@ -55,13 +73,26 @@ export default function BreadCrumb1() {
                             primaryMaterial: fb.primaryMaterial || [] // Add primary material array from Firebase
                         } as ProductType
                     })
-                    // Filter by categoryId if provided
-                    const filtered = categoryId
+                    console.log('Converted products - total:', list.length);
+                    
+                    // Filter by vendorId if provided, otherwise filter by categoryId
+                    const filtered = vendorId
+                        ? list.filter(p => {
+                            const matches = (p as any).vendor === vendorId;
+                            console.log(`Product "${p.name}" vendor check:`, { vendor: (p as any).vendor, vendorId, matches });
+                            return matches;
+                        })
+                        : categoryId
                         ? list.filter(p => {
                             const fbCatId = (p as any).category;
-                            return fbCatId === categoryId;
+                            const matches = fbCatId === categoryId;
+                            console.log(`Product "${p.name}" category check:`, { fbCatId, categoryId, matches });
+                            return matches;
                         })
                         : list
+                    
+                    console.log('Filtered products - total:', filtered.length);
+                    console.log('Filtered product names:', filtered.map(p => p.name));
                     setProducts(filtered)
                 } else {
                     setProducts([])
@@ -74,7 +105,12 @@ export default function BreadCrumb1() {
             }
         }
         fetchProducts()
-    }, [categoryId])
+        
+        // Fetch vendor data if vendorId is provided
+        if (vendorId) {
+            fetchVendorData(vendorId)
+        }
+    }, [categoryId, vendorId])
 
     return (
         <>
@@ -83,7 +119,7 @@ export default function BreadCrumb1() {
          <MenuFurniture props="bg-white" />
          <MenuCategory />
          </div>
-            <ShopBreadCrumb1 data={products} productPerPage={9} dataType={type} gender={gender} category={category} categoryId={categoryId} />
+            <ShopBreadCrumb1 data={products} productPerPage={9} dataType={type} gender={gender} category={category} categoryId={categoryId} vendorId={vendorId} vendorName={vendorName} />
             <Footer />      
         </>
     )

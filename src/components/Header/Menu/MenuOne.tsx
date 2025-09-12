@@ -14,6 +14,8 @@ import { useModalWishlistContext } from '@/context/ModalWishlistContext';
 import { useModalSearchContext } from '@/context/ModalSearchContext';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '@/firebase/config';
 
 interface Props {
     props: string;
@@ -30,9 +32,26 @@ const MenuOne: React.FC<Props> = ({ props }) => {
     const { cartState } = useCart()
     const { openModalWishlist } = useModalWishlistContext()
     const { openModalSearch } = useModalSearchContext()
+    
+    // Firebase Authentication state
+    const [user, loading, authError] = useAuthState(auth)
+    const isLoggedIn = !!user
 
     const handleOpenSubNavMobile = (index: number) => {
         setOpenSubNavMobile(openSubNavMobile === index ? null : index)
+    }
+
+    const handleLogout = async () => {
+        try {
+            await auth.signOut()
+            // Close the popup if it's open
+            if (openLoginPopup) {
+                handleLoginPopup()
+            }
+            router.push('/')
+        } catch (error) {
+            console.error('Error signing out:', error)
+        }
     }
 
     const [fixedHeader, setFixedHeader] = useState(false)
@@ -1108,13 +1127,30 @@ const MenuOne: React.FC<Props> = ({ props }) => {
                                         className={`login-popup absolute top-[74px] w-[320px] p-7 rounded-xl bg-white box-shadow-sm 
                                             ${openLoginPopup ? 'open' : ''}`}
                                     >
-                                        <Link href={'/login'} className="button-main w-full text-center">Login</Link>
-                                        <div className="text-secondary text-center mt-3 pb-4">Don’t have an account?
-                                            <Link href={'/register'} className='text-black pl-1 hover:underline'>Register</Link>
-                                        </div>
-                                        <Link href={'/my-account'} className="button-main bg-white text-black border border-black w-full text-center">Dashboard</Link>
+                                        {!isLoggedIn ? (
+                                            <>
+                                                <Link href={'/login'} className="button-main w-full text-center">Login</Link>
+                                                <div className="text-secondary text-center mt-3 pb-4">Don't have an account?
+                                                    <Link href={'/register'} className='text-black pl-1 hover:underline'>Register</Link>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="text-center mb-4">
+                                                    <div className="text-black font-medium">Welcome back!</div>
+                                                    <div className="text-secondary text-sm">{user?.email || 'User'}</div>
+                                                </div>
+                                                <Link href={'/my-account'} className="button-main w-full text-center">My Profile</Link>
+                                                <button 
+                                                    onClick={handleLogout}
+                                                    className="button-main bg-white text-black border border-black w-full text-center mt-3"
+                                                >
+                                                    Logout
+                                                </button>
+                                            </>
+                                        )}
                                         <div className="bottom mt-4 pt-4 border-t border-line"></div>
-                                        <Link href={'#!'} className='body1 hover:underline'>Support</Link>
+                                        <Link href={'/pages/contact'} className='body1 hover:underline'>Support</Link>
                                     </div>
                                 </div>
                                 <Link href={'/wishlist'} className="max-md:hidden wishlist-icon flex items-center cursor-pointer">

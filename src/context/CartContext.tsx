@@ -29,12 +29,14 @@ type CartAction =
         }
     }
     | { type: 'LOAD_CART'; payload: CartItem[] }
+    | { type: 'CLEAR_CART' }
 
 interface CartContextProps {
     cartState: CartState;
     addToCart: (item: ProductType) => Promise<boolean>; // Return boolean to indicate success/failure
     removeFromCart: (itemId: string) => void;
     updateCart: (itemId: string, quantity: number, selectedSize: string, selectedColor: string) => void;
+    clearCart: () => void;
     requireLogin: () => void; // Function to handle login requirement
 }
 
@@ -71,6 +73,11 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
             return {
                 ...state,
                 cartArray: action.payload,
+            };
+        case 'CLEAR_CART':
+            return {
+                ...state,
+                cartArray: [],
             };
         default:
             return state;
@@ -196,8 +203,23 @@ export const CartProviderWithSync: React.FC<{ children: React.ReactNode }> = ({ 
         }
     };
 
+    const clearCart = () => {
+        dispatch({ type: 'CLEAR_CART' });
+        
+        // Clear Firebase cart for authenticated users
+        if (user) {
+            (async () => {
+                try {
+                    await overwriteFirebaseCartFromItems(user.uid, []);
+                } catch (e) {
+                    console.error('Error clearing Firebase cart:', e);
+                }
+            })();
+        }
+    };
+
     return (
-        <CartContext.Provider value={{ cartState, addToCart, removeFromCart, updateCart, requireLogin }}>
+        <CartContext.Provider value={{ cartState, addToCart, removeFromCart, updateCart, clearCart, requireLogin }}>
             {children}
         </CartContext.Provider>
     );

@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { ref, get, set, remove, child } from 'firebase/database'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { database, storage } from '@/firebase/config'
+import { fetchVendors, Vendor } from '@/firebase/vendors'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ProductType, ReviewType } from '@/type/ProductType'
@@ -67,6 +68,8 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     const [categoryError, setCategoryError] = useState<string | null>(null);
     const [brandData, setBrandData] = useState<BrandType | null>(null);
     const [brandError, setBrandError] = useState<string | null>(null);
+    const [vendorData, setVendorData] = useState<Vendor | null>(null);
+    const [vendorError, setVendorError] = useState<string | null>(null);
     const [attributesData, setAttributesData] = useState<AttributeType[]>([]);
     const [attributesError, setAttributesError] = useState<string | null>(null);
     const [reviewRating, setReviewRating] = useState<number>(0);
@@ -166,6 +169,50 @@ const Default: React.FC<Props> = ({ data, productId }) => {
             } else {
                 setBrandError('Unable to load brand information. Please try again later.');
                 setBrandData(null);
+            }
+        }
+    };
+
+    const fetchVendorData = async (vendorId: string, retryCount = 0) => {
+        try {
+            console.log('🔍 Fetching vendor data for ID:', vendorId);
+            const vendorRef = ref(database, `vendors/${vendorId}`);
+            console.log('🔍 Vendor ref path:', `vendors/${vendorId}`);
+            
+            const snapshot = await get(vendorRef);
+            console.log('🔍 Vendor snapshot exists:', snapshot.exists());
+            
+            if (snapshot.exists()) {
+                const vendorData = snapshot.val();
+                console.log('🔍 Vendor data received:', vendorData);
+                setVendorData({
+                    id: vendorId,
+                    ...vendorData
+                });
+                setVendorError(null);
+                console.log('✅ Vendor data set successfully');
+            } else {
+                console.log('❌ Vendor not found in Firebase');
+                if (retryCount < 2) {
+                    // Retry after 1 second
+                    setTimeout(() => {
+                        fetchVendorData(vendorId, retryCount + 1);
+                    }, 1000);
+                } else {
+                    setVendorError('Vendor information not available');
+                    setVendorData(null);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching vendor:', error);
+            if (retryCount < 2) {
+                // Retry after 1 second
+                setTimeout(() => {
+                    fetchVendorData(vendorId, retryCount + 1);
+                }, 1000);
+            } else {
+                setVendorError('Unable to load vendor information. Please try again later.');
+                setVendorData(null);
             }
         }
     };
@@ -459,6 +506,14 @@ const Default: React.FC<Props> = ({ data, productId }) => {
             fetchBrandData(productMain.brands[0]);
         } else {
             console.log('❌ No brands found in productMain');
+        }
+        
+        // Fetch vendor data
+        if ((productMain as any)?.vendor) {
+            console.log('✅ Found vendor, fetching vendor:', (productMain as any).vendor);
+            fetchVendorData((productMain as any).vendor);
+        } else {
+            console.log('❌ No vendor found in productMain');
         }
         
         // Fetch product-specific tags
@@ -811,14 +866,28 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     </div>
                                     
                                     <div className="flex items-center gap-1 mt-3">
-                                        <div className="text-title">Brand:</div>
+                                        <div className="text-title">Vendor:</div>
                                         <div className="text-secondary">
-                                            {brandError ? (
-                                                <span className="text-red-500">{brandError}</span>
-                                            ) : brandData ? (
-                                                brandData.name
+                                            {(productMain as any)?.vendor === 'admin' ? (
+                                                'Admin'
+                                            ) : vendorError ? (
+                                                <span className="text-red-500">{vendorError}</span>
+                                            ) : vendorData ? (
+                                                <Link 
+                                                    href={`/shop/vendors?vendorId=${(productMain as any)?.vendor}`}
+                                                    className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                                >
+                                                    {vendorData.storeName || vendorData.name || (productMain as any)?.vendor}
+                                                </Link>
+                                            ) : (productMain as any)?.vendor ? (
+                                                <Link 
+                                                    href={`/shop/vendors?vendorId=${(productMain as any)?.vendor}`}
+                                                    className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                                                >
+                                                    Loading...
+                                                </Link>
                                             ) : (
-                                                'Loading...'
+                                                'N/A'
                                             )}
                                         </div>
                                     </div>

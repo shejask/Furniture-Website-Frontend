@@ -23,6 +23,10 @@ export interface FirebaseProductType {
     tags?: string[];
     categories?: string[];
     brands?: string[];
+    subCategory?: string;
+    subCategories?: string[];
+    style?: string[];
+    primaryMaterial?: string[];
     metaTitle?: string;
     metaDescription?: string;
     metaImage?: string;
@@ -108,9 +112,14 @@ export const convertFirebaseToUIProduct = (product: FirebaseProductType) => {
         review: 0,
         gender: '',
         brand: product.brands?.[0] || '',
+        brands: product.brands || [],
         action: 'add to cart',
         quantityPurchase: 1,
         vendor: product.vendor,
+        subCategory: product.subCategory,
+        subCategories: product.subCategories,
+        style: product.style || [],
+        primaryMaterial: product.primaryMaterial || [],
         unit: product.unit,
         weight: product.weight,
         sizeChart: product.sizeChart,

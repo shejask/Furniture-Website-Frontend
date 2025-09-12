@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import * as Icon from "@phosphor-icons/react/dist/ssr";
 import { ProductType } from '@/type/ProductType'
 import Product from '../Product/Product';
@@ -10,6 +11,8 @@ import 'rc-slider/assets/index.css'
 import HandlePagination from '../Other/HandlePagination';
 import { ref, get } from 'firebase/database'
 import { database } from '@/firebase/config'
+import { fetchVendors, Vendor } from '@/firebase/vendors'
+import { fetchBrands, Brand } from '@/firebase/brands'
 
 interface Props {
     data: Array<ProductType>
@@ -18,16 +21,20 @@ interface Props {
     gender: string | null
     category: string | null
     categoryId?: string | null
+    vendorId?: string | null
+    vendorName?: string
 }
 
-const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gender, category, categoryId }) => {
-    const [showOnlySale, setShowOnlySale] = useState(false)
+const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gender, category, categoryId, vendorId, vendorName }) => {
     const [sortOption, setSortOption] = useState('');
     const [type, setType] = useState<string | null | undefined>(dataType)
-    const [size, setSize] = useState<string | null>()
-    const [color, setColor] = useState<string | null>()
+    const [selectedBrandFilter, setSelectedBrandFilter] = useState<string | null>()
+    const [allBrands, setAllBrands] = useState<Brand[]>([])
+    const [selectedStyle, setSelectedStyle] = useState<string | null>()
+    const [selectedMaterial, setSelectedMaterial] = useState<string | null>()
     const [brand, setBrand] = useState<string | null>()
-    const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 100 });
+    const [priceRange, setPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 50000 });
+    const [actualPriceRange, setActualPriceRange] = useState<{ min: number; max: number }>({ min: 0, max: 50000 });
     const [currentPage, setCurrentPage] = useState(0);
     const productsPerPage = productPerPage;
     const offset = currentPage * productsPerPage;
@@ -35,7 +42,13 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
     // Category meta and subcategories
     const [categoryName, setCategoryName] = useState<string>('Shop')
     const [categoryDescription, setCategoryDescription] = useState<string>('')
+    const [categoryBanner, setCategoryBanner] = useState<string>('')
     const [subCategories, setSubCategories] = useState<Array<{ id: string; name: string }>>([])
+    const [allSubCategories, setAllSubCategories] = useState<Array<{ id: string; name: string; categoryId: string }>>([])
+    
+    // Vendors
+    const [vendors, setVendors] = useState<Vendor[]>([])
+    const [vendorMap, setVendorMap] = useState<Record<string, string>>({})
 
     useEffect(() => {
         const fetchCategory = async () => {
@@ -47,25 +60,128 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
                     const cat = snapshot.val() as any
                     setCategoryName(cat?.name || 'Shop')
                     setCategoryDescription(cat?.description || '')
+                    setCategoryBanner(cat?.banner || '')
                     const subs = Array.isArray(cat?.subCategories) ? cat.subCategories : []
-                    setSubCategories(subs.map((s: any) => ({ id: s.id, name: s.name })))
+                    setSubCategories(subs.map((s: any) => {
+                        // Handle both object format {id, name} and string format
+                        if (typeof s === 'object' && s.id && s.name) {
+                            return { id: s.id, name: s.name }
+                        } else if (typeof s === 'string') {
+                            return { id: s, name: s }
+                        }
+                        return { id: '', name: '' }
+                    }).filter((sub: { id: string; name: string }) => sub.id && sub.name))
                 } else {
                     setCategoryName('Shop')
                     setCategoryDescription('')
+                    setCategoryBanner('')
                     setSubCategories([])
                 }
             } catch (e) {
                 setCategoryName('Shop')
                 setCategoryDescription('')
+                setCategoryBanner('')
                 setSubCategories([])
             }
         }
         fetchCategory()
     }, [categoryId])
 
-    const handleShowOnlySale = () => {
-        setShowOnlySale(toggleSelect => !toggleSelect)
-    }
+    useEffect(() => {
+        const fetchVendorsData = async () => {
+            try {
+                const vendorsData = await fetchVendors()
+                setVendors(vendorsData)
+                
+                // Create a map of vendor ID to business name
+                const map: Record<string, string> = {}
+                vendorsData.forEach(vendor => {
+                    map[vendor.id] = vendor.businessName || vendor.storeName || vendor.name || vendor.id
+                })
+                setVendorMap(map)
+            } catch (error) {
+                console.error('Error fetching vendors:', error)
+            }
+        }
+        fetchVendorsData()
+    }, [])
+
+    useEffect(() => {
+        const fetchSubCategoriesForCategory = async () => {
+            try {
+                if (!categoryId) {
+                    setAllSubCategories([])
+                    return
+                }
+
+                const categoryRef = ref(database, `categories/${categoryId}`)
+                const snapshot = await get(categoryRef)
+                
+                if (snapshot.exists()) {
+                    const categoryData = snapshot.val()
+                    const subCategories: Array<{ id: string; name: string; categoryId: string }> = []
+                    
+                    if (categoryData.subCategories && Array.isArray(categoryData.subCategories)) {
+                        categoryData.subCategories.forEach((sub: any) => {
+                            // Handle both object format {id, name} and string format
+                            if (typeof sub === 'object' && sub.id && sub.name) {
+                                subCategories.push({
+                                    id: sub.id,
+                                    name: sub.name,
+                                    categoryId: categoryId
+                                })
+                            } else if (typeof sub === 'string') {
+                                // If sub is just a string, use it as both id and name
+                                subCategories.push({
+                                    id: sub,
+                                    name: sub,
+                                    categoryId: categoryId
+                                })
+                            }
+                        })
+                    }
+                    
+                    setAllSubCategories(subCategories)
+                } else {
+                    setAllSubCategories([])
+                }
+            } catch (error) {
+                console.error('Error fetching subcategories:', error)
+                setAllSubCategories([])
+            }
+        }
+        fetchSubCategoriesForCategory()
+    }, [categoryId])
+
+    useEffect(() => {
+        const loadBrands = async () => {
+            try {
+                const brands = await fetchBrands()
+                setAllBrands(brands)
+            } catch (error) {
+                console.error('Error loading brands:', error)
+            }
+        }
+        loadBrands()
+    }, [])
+
+    useEffect(() => {
+        // Calculate actual price range from product data
+        if (data.length > 0) {
+            const prices = data.map(product => product.price);
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+            const roundedMin = Math.floor(minPrice / 500) * 500; // Round down to nearest 500
+            const roundedMax = Math.ceil(maxPrice / 500) * 500; // Round up to nearest 500
+            
+            setActualPriceRange({ min: roundedMin, max: roundedMax });
+            // Only set initial price range if it hasn't been changed by user
+            if (priceRange.min === 0 && priceRange.max === 50000) {
+                setPriceRange({ min: roundedMin, max: roundedMax });
+            }
+        }
+    }, [data])
+
 
     const handleSortChange = (option: string) => {
         setSortOption(option);
@@ -77,8 +193,18 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
         setCurrentPage(0);
     }
 
-    const handleSize = (size: string) => {
-        setSize((prevSize) => (prevSize === size ? null : size))
+    const handleBrandFilter = (brandId: string) => {
+        setSelectedBrandFilter((prevBrand) => (prevBrand === brandId ? null : brandId))
+        setCurrentPage(0);
+    }
+
+    const handleStyle = (style: string) => {
+        setSelectedStyle((prevStyle) => (prevStyle === style ? null : style))
+        setCurrentPage(0);
+    }
+
+    const handleMaterial = (material: string) => {
+        setSelectedMaterial((prevMaterial) => (prevMaterial === material ? null : material))
         setCurrentPage(0);
     }
 
@@ -89,10 +215,6 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
         }
     };
 
-    const handleColor = (color: string) => {
-        setColor((prevColor) => (prevColor === color ? null : color))
-        setCurrentPage(0);
-    }
 
     const handleBrand = (brand: string) => {
         setBrand((prevBrand) => (prevBrand === brand ? null : brand));
@@ -102,10 +224,6 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
 
     // Filter product
     let filteredData = data.filter(product => {
-        let isShowOnlySaleMatched = true;
-        if (showOnlySale) {
-            isShowOnlySaleMatched = product.sale
-        }
 
         let isDatagenderMatched = true;
         if (gender) {
@@ -126,47 +244,64 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
 
         let isTypeMatched = true;
         if (type) {
-            dataType = type
-            isTypeMatched = product.type === type;
+            // Check if type matches subcategory ID in subCategories array or single subCategory field
+            const productSubCategories = (product as any).subCategories || [];
+            const productSubCategory = (product as any).subCategory;
+            isTypeMatched = productSubCategories.includes(type) || productSubCategory === type;
         }
 
-        let isSizeMatched = true;
-        if (size) {
-            isSizeMatched = product.sizes.includes(size)
+        let isBrandFilterMatched = true;
+        if (selectedBrandFilter) {
+            // Check if product has brands array and includes the selected brand
+            const productBrands = (product as any).brands || [];
+            isBrandFilterMatched = productBrands.includes(selectedBrandFilter);
+            console.log(`Filtering product "${product.name}" for brand "${selectedBrandFilter}":`, {
+                productBrands,
+                selectedBrandFilter,
+                matches: isBrandFilterMatched
+            });
+        }
+
+        let isStyleMatched = true;
+        if (selectedStyle) {
+            // Check if product has style array and includes the selected style
+            const productStyles = (product as any).style || [];
+            isStyleMatched = productStyles.some((style: string) => style.toLowerCase() === selectedStyle.toLowerCase());
+            console.log(`Filtering product "${product.name}" for style "${selectedStyle}":`, {
+                productStyles,
+                selectedStyle,
+                matches: isStyleMatched
+            });
         }
 
         let isPriceRangeMatched = true;
-        if (priceRange.min !== 0 || priceRange.max !== 100) {
+        if (priceRange.min !== actualPriceRange.min || priceRange.max !== actualPriceRange.max) {
             isPriceRangeMatched = product.price >= priceRange.min && product.price <= priceRange.max;
         }
 
-        let isColorMatched = true;
-        if (color) {
-            isColorMatched = product.variation.some(item => item.color === color)
+        let isMaterialMatched = true;
+        if (selectedMaterial) {
+            // Check if product has primaryMaterial array and includes the selected material
+            const productMaterials = (product as any).primaryMaterial || [];
+            isMaterialMatched = productMaterials.some((material: string) => material === selectedMaterial);
+            console.log(`Filtering product "${product.name}" for material "${selectedMaterial}":`, {
+                productMaterials,
+                selectedMaterial,
+                matches: isMaterialMatched
+            });
         }
 
         let isBrandMatched = true;
         if (brand) {
-            isBrandMatched = product.brand === brand;
+            isBrandMatched = (product as any).vendor === brand;
         }
 
-        return isShowOnlySaleMatched && isDatagenderMatched && isDataCategoryMatched && isDataTypeMatched && isTypeMatched && isSizeMatched && isColorMatched && isBrandMatched && isPriceRangeMatched
+        return isDatagenderMatched && isDataCategoryMatched && isDataTypeMatched && isTypeMatched && isBrandFilterMatched && isStyleMatched && isMaterialMatched && isBrandMatched && isPriceRangeMatched;
     })
 
 
     // Create a copy array filtered to sort
     let sortedData = [...filteredData];
-
-    if (sortOption === 'soldQuantityHighToLow') {
-        filteredData = sortedData.sort((a, b) => b.sold - a.sold)
-    }
-
-    if (sortOption === 'discountHighToLow') {
-        filteredData = sortedData
-            .sort((a, b) => (
-                (Math.floor(100 - ((b.price / b.originPrice) * 100))) - (Math.floor(100 - ((a.price / a.originPrice) * 100)))
-            ))
-    }
 
     if (sortOption === 'priceHighToLow') {
         filteredData = sortedData.sort((a, b) => b.price - a.price)
@@ -178,8 +313,9 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
 
     const totalProducts = filteredData.length
     const selectedType = type
-    const selectedSize = size
-    const selectedColor = color
+    const selectedBrandName = selectedBrandFilter ? allBrands.find(b => b.id === selectedBrandFilter)?.name : null
+    const selectedStyleName = selectedStyle
+    const selectedMaterialName = selectedMaterial
     const selectedBrand = brand
 
 
@@ -233,13 +369,13 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
 
     const handleClearAll = () => {
         dataType = null
-        setShowOnlySale(false);
         setSortOption('');
         setType(null);
-        setSize(null);
-        setColor(null);
+        setSelectedBrandFilter(null);
+        setSelectedStyle(null);
+        setSelectedMaterial(null);
         setBrand(null);
-        setPriceRange({ min: 0, max: 100 });
+        setPriceRange({ min: actualPriceRange.min, max: actualPriceRange.max });
         setCurrentPage(0);
         handleType(null)
     };
@@ -256,9 +392,9 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
                                     <Icon.CaretRight size={14} className='text-secondary2' />
                                     <Link href={'/shop/breadcrumb1'} className='text-secondary2'>Shop</Link>
                                     <Icon.CaretRight size={14} className='text-secondary2' />
-                                    <div className='text-secondary2 capitalize'>{categoryName}</div>
+                                    <div className='text-secondary2 capitalize'>{vendorId ? vendorName : categoryName}</div>
                                 </div>
-                                <div className="heading2 text-center mt-2">{categoryName}</div>
+                                <div className="heading2 text-center mt-2">{vendorId ? vendorName : categoryName}</div>
                                 {categoryDescription && (
                                     <div className="caption1 text-center text-secondary mt-3 max-w-3xl">
                                         {categoryDescription}
@@ -282,6 +418,20 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
                             </div>
                         </div>
                     </div>
+                    {categoryBanner && (
+                        <div className="container pb-10">
+                            <div className="w-full">
+                                <Image
+                                    src={categoryBanner}
+                                    alt={categoryName}
+                                    width={2560}
+                                    height={500}
+                                    className="w-full h-auto rounded-xl object-cover"
+                                    priority
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -290,177 +440,186 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
                     <div className="flex max-md:flex-wrap max-md:flex-col-reverse gap-y-8">
                         <div className="sidebar lg:w-1/4 md:w-1/3 w-full md:pr-12">
                             <div className="filter-type pb-8 border-b border-line">
-                                <div className="heading6">Products Type</div>
+                                <div className="heading6">Sub Categories</div>
                                 <div className="list-type mt-4">
-                                    {['t-shirt', 'dress', 'top', 'swimwear', 'shirt', 'underwear', 'sets', 'accessories'].map((item, index) => (
-                                        <div
-                                            key={index}
-                                            className={`item flex items-center justify-between cursor-pointer ${dataType === item ? 'active' : ''}`}
-                                            onClick={() => handleType(item)}
-                                        >
-                                            <div className='text-secondary has-line-before hover:text-black capitalize'>{item}</div>
+                                    {categoryId ? (
+                                        allSubCategories.length > 0 ? (
+                                            allSubCategories.map((subCategory, index) => (
+                                                <div
+                                                    key={index}
+                                                    className={`item flex items-center justify-between cursor-pointer ${dataType === subCategory.id ? 'active' : ''}`}
+                                                    onClick={() => handleType(subCategory.id)}
+                                                >
+                                                    <div className='text-secondary has-line-before hover:text-black capitalize'>{subCategory.name}</div>
+                                                    <div className='text-secondary2'>
+                                                        ({data.filter(dataItem => {
+                                                            const productSubCategories = (dataItem as any).subCategories || [];
+                                                            const productSubCategory = (dataItem as any).subCategory;
+                                                            return productSubCategories.includes(subCategory.id) || productSubCategory === subCategory.id;
+                                                        }).length})
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="text-secondary text-sm">No subcategories available for this category</div>
+                                        )
+                                    ) : (
+                                        <div className="text-secondary text-sm">Select a category to view subcategories</div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="filter-brand pb-8 border-b border-line mt-8">
+                                <div className="heading6">Brands</div>
+                                <div className="list-brand mt-4">
+                                    {allBrands.length > 0 ? (
+                                        allBrands.map((brand, index) => (
+                                            <div key={index} className="brand-item flex items-center justify-between mt-3">
+                                                <div className="left flex items-center cursor-pointer" onClick={() => handleBrandFilter(brand.id)}>
+                                                    <div className="block-input">
+                                                        <input
+                                                            type="checkbox"
+                                                            name={brand.id}
+                                                            id={brand.id}
+                                                            checked={selectedBrandFilter === brand.id}
+                                                            onChange={() => handleBrandFilter(brand.id)} />
+                                                        <Icon.CheckSquare size={20} weight='fill' className='icon-checkbox' />
+                                                    </div>
+                                                    <label htmlFor={brand.id} className='brand-name capitalize pl-2 cursor-pointer'>{brand.name}</label>
+                                                </div>
+                                                <div className='text-secondary2'>
+                                                    ({(() => {
+                                                        const matchingProducts = data.filter(dataItem => {
+                                                            const productBrands = (dataItem as any).brands || [];
+                                                            const matches = productBrands.includes(brand.id);
+                                                            console.log(`Product "${dataItem.name}" brand check for "${brand.name}" (${brand.id}):`, {
+                                                                productBrands,
+                                                                brandId: brand.id,
+                                                                matches
+                                                            });
+                                                            return matches;
+                                                        });
+                                                        console.log(`Total products for brand "${brand.name}":`, matchingProducts.length);
+                                                        return matchingProducts.length;
+                                                    })()})
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-secondary text-sm">No brands available</div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="filter-style pb-8 border-b border-line mt-8">
+                                <div className="heading6">Style & Design</div>
+                                <div className="list-style mt-4">
+                                    {['Modern', 'Scandinavian', 'Contemporary', 'Industrial', 'Minimalist', 'Bohemian', 'Traditional'].map((style, index) => (
+                                        <div key={index} className="style-item flex items-center justify-between mt-3">
+                                            <div className="left flex items-center cursor-pointer" onClick={() => handleStyle(style)}>
+                                                <div className="block-input">
+                                                    <input
+                                                        type="checkbox"
+                                                        name={style}
+                                                        id={style}
+                                                        checked={selectedStyle === style}
+                                                        onChange={() => handleStyle(style)} />
+                                                    <Icon.CheckSquare size={20} weight='fill' className='icon-checkbox' />
+                                                </div>
+                                                <label htmlFor={style} className='style-name capitalize pl-2 cursor-pointer'>{style}</label>
+                                            </div>
                                             <div className='text-secondary2'>
-                                                ({data.filter(dataItem => dataItem.type === item && dataItem.category === 'fashion').length})
+                                                ({data.filter(dataItem => {
+                                                    const productStyles = (dataItem as any).style || [];
+                                                    return productStyles.some((productStyle: string) => productStyle.toLowerCase() === style.toLowerCase());
+                                                }).length})
                                             </div>
                                         </div>
                                     ))}
-                                </div>
-                            </div>
-                            <div className="filter-size pb-8 border-b border-line mt-8">
-                                <div className="heading6">Size</div>
-                                <div className="list-size flex items-center flex-wrap gap-3 gap-y-4 mt-4">
-                                    {
-                                        ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'].map((item, index) => (
-                                            <div
-                                                key={index}
-                                                className={`size-item text-button w-[44px] h-[44px] flex items-center justify-center rounded-full border border-line ${size === item ? 'active' : ''}`}
-                                                onClick={() => handleSize(item)}
-                                            >
-                                                {item}
-                                            </div>
-                                        ))
-                                    }
-                                    <div
-                                        className={`size-item text-button px-4 py-2 flex items-center justify-center rounded-full border border-line ${size === 'freesize' ? 'active' : ''}`}
-                                        onClick={() => handleSize('freesize')}
-                                    >
-                                        Freesize
-                                    </div>
                                 </div>
                             </div>
                             <div className="filter-price pb-8 border-b border-line mt-8">
                                 <div className="heading6">Price Range</div>
                                 <Slider
                                     range
-                                    defaultValue={[0, 100]}
-                                    min={0}
-                                    max={100}
+                                    value={[priceRange.min, priceRange.max]}
+                                    min={actualPriceRange.min}
+                                    max={actualPriceRange.max}
+                                    step={500}
                                     onChange={handlePriceChange}
                                     className='mt-5'
                                 />
                                 <div className="price-block flex items-center justify-between flex-wrap mt-4">
                                     <div className="min flex items-center gap-1">
                                         <div>Min price:</div>
-                                        <div className='price-min'>$
-                                            <span>{priceRange.min}</span>
+                                        <div className='price-min'>₹
+                                            <span>{priceRange.min.toLocaleString('en-IN')}</span>
                                         </div>
                                     </div>
-                                    <div className="min flex items-center gap-1">
+                                    <div className="max flex items-center gap-1">
                                         <div>Max price:</div>
-                                        <div className='price-max'>$
-                                            <span>{priceRange.max}</span>
+                                        <div className='price-max'>₹
+                                            <span>{priceRange.max.toLocaleString('en-IN')}</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="filter-color pb-8 border-b border-line mt-8">
-                                <div className="heading6">colors</div>
-                                <div className="list-color flex items-center flex-wrap gap-3 gap-y-4 mt-4">
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'pink' ? 'active' : ''}`}
-                                        onClick={() => handleColor('pink')}
-                                    >
-                                        <div className="color bg-[#F4C5BF] w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">pink</div>
-                                    </div>
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'red' ? 'active' : ''}`}
-                                        onClick={() => handleColor('red')}
-                                    >
-                                        <div className="color bg-red w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">red</div>
-                                    </div>
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'green' ? 'active' : ''}`}
-                                        onClick={() => handleColor('green')}
-                                    >
-                                        <div className="color bg-green w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">green</div>
-                                    </div>
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'yellow' ? 'active' : ''}`}
-                                        onClick={() => handleColor('yellow')}
-                                    >
-                                        <div className="color bg-yellow w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">yellow</div>
-                                    </div>
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'purple' ? 'active' : ''}`}
-                                        onClick={() => handleColor('purple')}
-                                    >
-                                        <div className="color bg-purple w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">purple</div>
-                                    </div>
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'black' ? 'active' : ''}`}
-                                        onClick={() => handleColor('black')}
-                                    >
-                                        <div className="color bg-black w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">black</div>
-                                    </div>
-                                    <div
-                                        className={`color-item px-3 py-[5px] flex items-center justify-center gap-2 rounded-full border border-line ${color === 'white' ? 'active' : ''}`}
-                                        onClick={() => handleColor('white')}
-                                    >
-                                        <div className="color bg-[#F6EFDD] w-5 h-5 rounded-full"></div>
-                                        <div className="caption1 capitalize">white</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="filter-brand mt-8">
-                                <div className="heading6">Brands</div>
-                                <div className="list-brand mt-4">
-                                    {['adidas', 'hermes', 'zara', 'nike', 'gucci'].map((item, index) => (
-                                        <div key={index} className="brand-item flex items-center justify-between">
-                                            <div className="left flex items-center cursor-pointer">
+                            <div className="filter-material pb-8 border-b border-line mt-8">
+                                <div className="heading6">Primary Material</div>
+                                <div className="list-material mt-4">
+                                    {['Wood (Teak)', 'Wood (Oak)', 'Wood (Engineered)', 'Metal', 'Glass', 'Plastic', 'Rattan', 'Fabric', 'Marble', 'Granite', 'Ceramic', 'Bamboo'].map((material, index) => (
+                                        <div key={index} className="material-item flex items-center justify-between mt-3">
+                                            <div className="left flex items-center cursor-pointer" onClick={() => handleMaterial(material)}>
                                                 <div className="block-input">
                                                     <input
                                                         type="checkbox"
-                                                        name={item}
-                                                        id={item}
-                                                        checked={brand === item}
-                                                        onChange={() => handleBrand(item)} />
+                                                        name={material}
+                                                        id={material}
+                                                        checked={selectedMaterial === material}
+                                                        onChange={() => handleMaterial(material)} />
                                                     <Icon.CheckSquare size={20} weight='fill' className='icon-checkbox' />
                                                 </div>
-                                                <label htmlFor={item} className="brand-name capitalize pl-2 cursor-pointer">{item}</label>
+                                                <label htmlFor={material} className='material-name pl-2 cursor-pointer'>{material}</label>
                                             </div>
                                             <div className='text-secondary2'>
-                                                ({data.filter(dataItem => dataItem.brand === item && dataItem.category === 'fashion').length})
+                                                ({data.filter(dataItem => {
+                                                    const productMaterials = (dataItem as any).primaryMaterial || [];
+                                                    return productMaterials.some((productMaterial: string) => productMaterial === material);
+                                                }).length})
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                            <div className="filter-brand mt-8">
+                                <div className="heading6">Vendors</div>
+                                <div className="list-brand mt-4">
+                                    {Array.from(new Set(data.map(item => (item as any).vendor).filter(Boolean))).map((vendorId, index) => {
+                                        const vendorName = vendorMap[vendorId] || vendorId
+                                        return (
+                                            <div key={index} className="brand-item flex items-center justify-between">
+                                                <div className="left flex items-center cursor-pointer">
+                                                    <div className="block-input">
+                                                        <input
+                                                            type="checkbox"
+                                                            name={vendorId}
+                                                            id={vendorId}
+                                                            checked={brand === vendorId}
+                                                            onChange={() => handleBrand(vendorId)} />
+                                                        <Icon.CheckSquare size={20} weight='fill' className='icon-checkbox' />
+                                                    </div>
+                                                    <label htmlFor={vendorId} className="brand-name capitalize pl-2 cursor-pointer">{vendorName}</label>
+                                                </div>
+                                                <div className='text-secondary2'>
+                                                    ({data.filter(dataItem => (dataItem as any).vendor === vendorId).length})
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>
                         <div className="list-product-block lg:w-3/4 md:w-2/3 w-full md:pl-3">
                             <div className="filter-heading flex items-center justify-between gap-5 flex-wrap">
                                 <div className="left flex has-line items-center flex-wrap gap-5">
-                                    <div className="choose-layout flex items-center gap-2">
-                                        <div className="item three-col w-8 h-8 border border-line rounded flex items-center justify-center cursor-pointer active">
-                                            <div className='flex items-center gap-0.5'>
-                                                <span className='w-[3px] h-4 bg-secondary2 rounded-sm'></span>
-                                                <span className='w-[3px] h-4 bg-secondary2 rounded-sm'></span>
-                                                <span className='w-[3px] h-4 bg-secondary2 rounded-sm'></span>
-                                            </div>
-                                        </div>
-                                        <Link href={'/shop/sidebar-list'} className="item row w-8 h-8 border border-line rounded flex items-center justify-center cursor-pointer">
-                                            <div className='flex flex-col items-center gap-0.5'>
-                                                <span className='w-4 h-[3px] bg-secondary2 rounded-sm'></span>
-                                                <span className='w-4 h-[3px] bg-secondary2 rounded-sm'></span>
-                                                <span className='w-4 h-[3px] bg-secondary2 rounded-sm'></span>
-                                            </div>
-                                        </Link>
-                                    </div>
-                                    <div className="check-sale flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            name="filterSale"
-                                            id="filter-sale"
-                                            className='border-line'
-                                            onChange={handleShowOnlySale}
-                                        />
-                                        <label htmlFor="filter-sale" className='cation1 cursor-pointer'>Show only products on sale</label>
-                                    </div>
                                 </div>
                                 <div className="right flex items-center gap-3">
                                     <div className="select-block relative">
@@ -471,11 +630,9 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
                                             onChange={(e) => { handleSortChange(e.target.value) }}
                                             defaultValue={'Sorting'}
                                         >
-                                            <option value="Sorting" disabled>Sorting</option>
-                                            <option value="soldQuantityHighToLow">Best Selling</option>
-                                            <option value="discountHighToLow">Best Discount</option>
-                                            <option value="priceHighToLow">Price High To Low</option>
-                                            <option value="priceLowToHigh">Price Low To High</option>
+                                        <option value="Sorting" disabled>Sorting</option>
+                                        <option value="priceHighToLow">Price High To Low</option>
+                                        <option value="priceLowToHigh">Price Low To High</option>
                                         </select>
                                         <Icon.CaretDown size={12} className='absolute top-1/2 -translate-y-1/2 md:right-4 right-2' />
                                     </div>
@@ -488,26 +645,32 @@ const ShopBreadCrumb1: React.FC<Props> = ({ data, productPerPage, dataType, gend
                                     <span className='text-secondary pl-1'>Products Found</span>
                                 </div>
                                 {
-                                    (selectedType || selectedSize || selectedColor || selectedBrand) && (
+                                    (selectedType || selectedBrandName || selectedStyleName || selectedMaterialName || selectedBrand) && (
                                         <>
                                             <div className="list flex items-center gap-3">
                                                 <div className='w-px h-4 bg-line'></div>
                                                 {selectedType && (
                                                     <div className="item flex items-center px-2 py-1 gap-1 bg-linear rounded-full capitalize" onClick={() => { setType(null) }}>
                                                         <Icon.X className='cursor-pointer' />
-                                                        <span>{selectedType}</span>
+                                                        <span>{allSubCategories.find(sub => sub.id === selectedType)?.name || selectedType}</span>
                                                     </div>
                                                 )}
-                                                {selectedSize && (
-                                                    <div className="item flex items-center px-2 py-1 gap-1 bg-linear rounded-full capitalize" onClick={() => { setSize(null) }}>
+                                                {selectedBrandName && (
+                                                    <div className="item flex items-center px-2 py-1 gap-1 bg-linear rounded-full capitalize" onClick={() => { setSelectedBrandFilter(null) }}>
                                                         <Icon.X className='cursor-pointer' />
-                                                        <span>{selectedSize}</span>
+                                                        <span>{selectedBrandName}</span>
                                                     </div>
                                                 )}
-                                                {selectedColor && (
-                                                    <div className="item flex items-center px-2 py-1 gap-1 bg-linear rounded-full capitalize" onClick={() => { setColor(null) }}>
+                                                {selectedStyleName && (
+                                                    <div className="item flex items-center px-2 py-1 gap-1 bg-linear rounded-full capitalize" onClick={() => { setSelectedStyle(null) }}>
                                                         <Icon.X className='cursor-pointer' />
-                                                        <span>{selectedColor}</span>
+                                                        <span>{selectedStyleName}</span>
+                                                    </div>
+                                                )}
+                                                {selectedMaterialName && (
+                                                    <div className="item flex items-center px-2 py-1 gap-1 bg-linear rounded-full capitalize" onClick={() => { setSelectedMaterial(null) }}>
+                                                        <Icon.X className='cursor-pointer' />
+                                                        <span>{selectedMaterialName}</span>
                                                     </div>
                                                 )}
                                                 {selectedBrand && (
