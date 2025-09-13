@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -25,15 +25,15 @@ import { Address } from '@/firebase/addresses'
 const Checkout = () => {
     const router = useRouter()
     const searchParams = useSearchParams()
-    let discount = searchParams.get('discount')
-    let ship = searchParams.get('ship')
+    const discount = searchParams.get('discount') || '0'
+    const ship = searchParams.get('ship') || '0'
 
     const { cartState, clearCart } = useCart();
     const { initiatePayment, isLoading, error } = useRazorpay();
     const [user, loading, authError] = useAuthState(auth);
     const { addresses, loading: addressLoading, addAddress, makeDefault, getDefaultAddress } = useAddresses();
     
-    let [totalCart, setTotalCart] = useState<number>(0)
+    const [totalCart, setTotalCart] = useState<number>(0)
     const [activePayment, setActivePayment] = useState<string>('razorpay')
     const [selectedAddress, setSelectedAddress] = useState<Address | null>(null)
     const [showAddressForm, setShowAddressForm] = useState<boolean>(false)
@@ -41,18 +41,28 @@ const Checkout = () => {
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
-        email: user?.email || '',
-        phoneNumber: '',
+        email: '',
+        phone: '',
         country: '',
         city: '',
-        address: '',
+        streetAddress: '',
         state: '',
-        postalCode: '',
+        zip: '',
         note: ''
     })
 
+    // Calculate total cart value
+    useEffect(() => {
+        let total = 0;
+        cartState.cartArray.forEach(item => {
+            const price = (item as any).salePrice ?? item.price;
+            total += price * item.quantity;
+        });
+        setTotalCart(total);
+    }, [cartState.cartArray]);
+
     // Update email when user changes
-    React.useEffect(() => {
+    useEffect(() => {
         if (user?.email && !formData.email) {
             setFormData(prev => ({
                 ...prev,
@@ -61,23 +71,23 @@ const Checkout = () => {
         }
     }, [user?.email, formData.email])
 
-    const populateFormWithAddress = React.useCallback((address: Address) => {
+    const populateFormWithAddress = useCallback((address: Address) => {
         setFormData(prev => ({
             firstName: address.firstName,
             lastName: address.lastName,
-            email: address.email,
-            phoneNumber: address.phoneNumber,
+            email: user?.email || prev.email,
+            phone: address.phone,
             country: address.country,
             city: address.city,
-            address: address.address,
+            streetAddress: address.streetAddress,
             state: address.state,
-            postalCode: address.postalCode,
+            zip: address.zip,
             note: prev.note // Keep existing note
         }))
-    }, [])
+    }, [user?.email])
 
     // Set default address when addresses load
-    React.useEffect(() => {
+    useEffect(() => {
         if (addresses.length > 0 && !selectedAddress) {
             const defaultAddr = getDefaultAddress()
             if (defaultAddr) {
@@ -99,18 +109,16 @@ const Checkout = () => {
             firstName: '',
             lastName: '',
             email: user?.email || '',
-            phoneNumber: '',
+            phone: '',
             country: '',
             city: '',
-            address: '',
+            streetAddress: '',
             state: '',
-            postalCode: '',
+            zip: '',
             note: ''
         })
         setShowAddressForm(true)
     }
-
-    cartState.cartArray.map(item => totalCart += (((item as any).salePrice ?? item.price) * item.quantity))
 
     const finalAmount = totalCart - Number(discount) + Number(ship)
 
@@ -126,7 +134,7 @@ const Checkout = () => {
     }
 
     const handleRazorpayPayment = async () => {
-        if (!formData.firstName || !formData.lastName || !formData.email || !formData.phoneNumber) {
+        if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
             alert('Please fill in all required fields')
             return
         }
@@ -134,7 +142,7 @@ const Checkout = () => {
         const userDetails = {
             name: `${formData.firstName} ${formData.lastName}`,
             email: formData.email,
-            contact: formData.phoneNumber
+            contact: formData.phone
         }
 
         await initiatePayment(
@@ -154,8 +162,10 @@ const Checkout = () => {
         )
     }
 
-    const handleFormSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const handleFormSubmit = async (e?: React.FormEvent) => {
+        if (e) {
+            e.preventDefault()
+        }
         
         // Save address if user wants to and it's a new address
         if (user && saveAddress && !selectedAddress && showAddressForm) {
@@ -163,13 +173,12 @@ const Checkout = () => {
                 await addAddress({
                     firstName: formData.firstName,
                     lastName: formData.lastName,
-                    email: formData.email,
-                    phoneNumber: formData.phoneNumber,
+                    phone: formData.phone,
                     country: formData.country,
                     city: formData.city,
-                    address: formData.address,
+                    streetAddress: formData.streetAddress,
                     state: formData.state,
-                    postalCode: formData.postalCode,
+                    zip: formData.zip,
                     isDefault: addresses.length === 0 // Make first address default
                 })
             } catch (error) {
@@ -227,7 +236,7 @@ const Checkout = () => {
                                 <>
                                     <div className="login bg-surface py-3 px-4 flex justify-between rounded-lg">
                                         <div className="left flex items-center"><span className="text-on-surface-variant1 pr-4">Already have an account? </span><Link href="/login" className="text-button text-on-surface hover-underline cursor-pointer">Login</Link></div>
-                                        <div className="right"><i className="ph ph-caret-down fs-20 d-block cursor-pointer"></i></div>
+                                        <div className="right"><Icon.CaretDown className="text-xl block cursor-pointer" /></div>
                                     </div>
                                     <div className="form-login-block mt-3">
                                         <form className="p-5 border border-line rounded-lg">
@@ -299,9 +308,9 @@ const Checkout = () => {
                                                                 )}
                                                             </div>
                                                             <div className="text-xs text-secondary">
-                                                                <div>{address.address}, {address.city}, {address.state} {address.postalCode}, {address.country}</div>
-                                                                <div className="mt-1">Phone: {address.phoneNumber}</div>
-                                                                <div>Email: {address.email}</div>
+                                                                <div>{address.streetAddress}, {address.city}, {address.state} {address.zip}, {address.country}</div>
+                                                                <div className="mt-1">Phone: {address.phone}</div>
+                                                                <div>Email: {user?.email || 'N/A'}</div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -371,10 +380,10 @@ const Checkout = () => {
                                                     <div className="">
                                                         <input 
                                                             className="border-line px-4 py-3 w-full rounded-lg" 
-                                                            id="phoneNumber" 
+                                                            id="phone" 
                                                             type="tel" 
                                                             placeholder="Phone Number *" 
-                                                            value={formData.phoneNumber}
+                                                            value={formData.phone}
                                                             onChange={handleInputChange}
                                                             required 
                                                         />
@@ -382,10 +391,10 @@ const Checkout = () => {
                                                     <div className="col-span-full">
                                                         <input 
                                                             className="border-line px-4 py-3 w-full rounded-lg" 
-                                                            id="address" 
+                                                            id="streetAddress" 
                                                             type="text" 
                                                             placeholder="Full Address (Street, Area, Landmark) *" 
-                                                            value={formData.address}
+                                                            value={formData.streetAddress}
                                                             onChange={handleInputChange}
                                                             required 
                                                         />
@@ -446,10 +455,10 @@ const Checkout = () => {
                                                     <div className="">
                                                         <input 
                                                             className="border-line px-4 py-3 w-full rounded-lg" 
-                                                            id="postalCode" 
+                                                            id="zip" 
                                                             type="text" 
                                                             placeholder="PIN Code *" 
-                                                            value={formData.postalCode}
+                                                            value={formData.zip}
                                                             onChange={handleInputChange}
                                                             required 
                                                         />
@@ -493,51 +502,53 @@ const Checkout = () => {
                                                     <div className="mt-3">
                                                         <textarea 
                                                             className="border border-line px-4 py-3 w-full rounded-lg" 
-                                                            id="orderNote" 
-                                                            name="orderNote" 
+                                                            id="note" 
+                                                            name="note" 
                                                             placeholder="Any special instructions for your order..."
                                                             value={formData.note}
                                                             onChange={handleInputChange}
                                                             rows={3}
-                                                        ></textarea>
+                                                        />
                                                     </div>
                                                 </div>
-                                                
-                                        <div className="payment-block md:mt-10 mt-6">
-                                            <div className="heading5">Choose payment Option:</div>
-                                            <div className="list-payment mt-5">
-                                                <div className={`type bg-surface p-5 border border-line rounded-lg ${activePayment === 'razorpay' ? 'open' : ''}`}>
-                                                    <input className="cursor-pointer" type="radio" id="razorpay" name="payment" checked={activePayment === 'razorpay'} onChange={() => handlePayment('razorpay')} />
-                                                    <label className="text-button pl-2 cursor-pointer" htmlFor="razorpay">Razorpay (UPI, Cards, Wallets, NetBanking)</label>
-                                                    <div className="infor">
-                                                        <div className="text-on-surface-variant1 pt-4">Pay securely using Razorpay. Supports UPI, Credit/Debit Cards, Net Banking, and Digital Wallets. Your payment is processed securely.</div>
-                                                        {error && (
-                                                            <div className="text-red mt-2 text-sm">{error}</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className={`type bg-surface p-5 border border-line rounded-lg mt-5 ${activePayment === 'cash-delivery' ? 'open' : ''}`}>
-                                                    <input className="cursor-pointer" type="radio" id="delivery" name="payment" checked={activePayment === 'cash-delivery'} onChange={() => handlePayment('cash-delivery')} />
-                                                    <label className="text-button pl-2 cursor-pointer" htmlFor="delivery">Cash on Delivery (COD)</label>
-                                                    <div className="infor">
-                                                        <div className="text-on-surface-variant1 pt-4">Pay with cash when your order is delivered to your doorstep. No advance payment required.</div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            </form>
                                         </div>
-                                        <div className="block-button md:mt-10 mt-6">
-                                            <button 
-                                                type="submit" 
-                                                className="button-main w-full"
-                                                disabled={isLoading}
-                                            >
-                                                {isLoading ? 'Processing...' : activePayment === 'razorpay' ? 'Proceed to Pay' : 'Pay Now'}
-                                            </button>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="payment-block md:mt-10 mt-6">
+                                <div className="heading5">Choose payment Option:</div>
+                                <div className="list-payment mt-5">
+                                    <div className={`type bg-surface p-5 border border-line rounded-lg ${activePayment === 'razorpay' ? 'open' : ''}`}>
+                                        <input className="cursor-pointer" type="radio" id="razorpay" name="payment" checked={activePayment === 'razorpay'} onChange={() => handlePayment('razorpay')} />
+                                        <label className="text-button pl-2 cursor-pointer" htmlFor="razorpay">Razorpay (UPI, Cards, Wallets, NetBanking)</label>
+                                        <div className="infor">
+                                            <div className="text-on-surface-variant1 pt-4">Pay securely using Razorpay. Supports UPI, Credit/Debit Cards, Net Banking, and Digital Wallets. Your payment is processed securely.</div>
+                                            {error && (
+                                                <div className="text-red mt-2 text-sm">{error}</div>
+                                            )}
                                         </div>
-                                    </form>
+                                    </div>
+                                    <div className={`type bg-surface p-5 border border-line rounded-lg mt-5 ${activePayment === 'cash-delivery' ? 'open' : ''}`}>
+                                        <input className="cursor-pointer" type="radio" id="delivery" name="payment" checked={activePayment === 'cash-delivery'} onChange={() => handlePayment('cash-delivery')} />
+                                        <label className="text-button pl-2 cursor-pointer" htmlFor="delivery">Cash on Delivery (COD)</label>
+                                        <div className="infor">
+                                            <div className="text-on-surface-variant1 pt-4">Pay with cash when your order is delivered to your doorstep. No advance payment required.</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-
+                            <div className="block-button md:mt-10 mt-6">
+                                <button 
+                                    type="button" 
+                                    className="button-main w-full"
+                                    disabled={isLoading}
+                                    onClick={() => handleFormSubmit()}
+                                >
+                                    {isLoading ? 'Processing...' : activePayment === 'razorpay' ? 'Proceed to Pay' : 'Pay Now'}
+                                </button>
+                            </div>
                         </div>
                         <div className="right w-5/12">
                             <div className="checkout-block">
@@ -546,37 +557,35 @@ const Checkout = () => {
                                     {cartState.cartArray.length < 1 ? (
                                         <p className='text-button pt-3'>No product in cart</p>
                                     ) : (
-                                        cartState.cartArray.map((product) => (
-                                            <>
-                                                <div className="item flex items-center justify-between w-full pb-5 border-b border-line gap-6 mt-5">
-                                                    <div className="bg-img w-[100px] aspect-square flex-shrink-0 rounded-lg overflow-hidden">
-                                                        <Image
-                                                            src={product.thumbImage && product.thumbImage[0] || '/images/product/default.png'}
-                                                            width={500}
-                                                            height={500}
-                                                            alt='img'
-                                                            className='w-full h-full'
-                                                        />
+                                        cartState.cartArray.map((product, index) => (
+                                            <div key={product.id || index} className="item flex items-center justify-between w-full pb-5 border-b border-line gap-6 mt-5">
+                                                <div className="bg-img w-[100px] aspect-square flex-shrink-0 rounded-lg overflow-hidden">
+                                                    <Image
+                                                        src={product.thumbImage && product.thumbImage[0] || '/images/product/default.png'}
+                                                        width={500}
+                                                        height={500}
+                                                        alt='img'
+                                                        className='w-full h-full'
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between w-full">
+                                                    <div>
+                                                        <div className="name text-title">{product.name}</div>
+                                                        <div className="caption1 text-secondary mt-2">
+                                                            <span className='size capitalize'>{product.selectedSize || (product.sizes && product.sizes[0]) || 'N/A'}</span>
+                                                            <span>/</span>
+                                                            <span className='color capitalize'>{product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color) || 'N/A'}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div>
-                                                            <div className="name text-title">{product.name}</div>
-                                                            <div className="caption1 text-secondary mt-2">
-                                                                <span className='size capitalize'>{product.selectedSize || (product.sizes && product.sizes[0]) || 'N/A'}</span>
-                                                                <span>/</span>
-                                                                <span className='color capitalize'>{product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color) || 'N/A'}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-title">
-                                                            <span className='quantity'>{product.quantity}</span>
-                                                            <span className='px-1'>x</span>
-                                                            <span>
-                                                                ₹{((product as any).salePrice ?? product.price)}.00
-                                                            </span>
-                                                        </div>
+                                                    <div className="text-title">
+                                                        <span className='quantity'>{product.quantity}</span>
+                                                        <span className='px-1'>x</span>
+                                                        <span>
+                                                            ₹{((product as any).salePrice ?? product.price)}.00
+                                                        </span>
                                                     </div>
                                                 </div>
-                                            </>
+                                            </div>
                                         ))
                                     )}
                                 </div>

@@ -2,8 +2,9 @@
 import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import TopNavOne from '@/components/Header/TopNav/TopNavOne'
-import MenuOne from '@/components/Header/Menu/MenuOne'
+import BannerTop from '@/components/Home3/BannerTop'
+import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
+import MenuCategory from '@/components/Furniture/MenuCategory'
 import Breadcrumb from '@/components/Breadcrumb/Breadcrumb'
 import Footer from '@/components/Footer/Footer'
 import * as Icon from "@phosphor-icons/react/dist/ssr"
@@ -23,11 +24,12 @@ const PaymentFailure = () => {
 
     return (
         <>
-            <TopNavOne props="style-one bg-black" slogan="New customers save 10% with the code GET10" />
             <div id="header" className='relative w-full'>
-                <MenuOne props="bg-transparent" />
-                <Breadcrumb heading='Payment Failed' subHeading='Payment Failed' />
+                <BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+                <MenuFurniture props="bg-white" />
+                <MenuCategory />
             </div>
+            {/* <Breadcrumb heading='Payment Failed' subHeading='Payment Failed' /> */}
             
             <div className="payment-failure md:py-20 py-10">
                 <div className="container">
@@ -38,15 +40,9 @@ const PaymentFailure = () => {
                         
                         <h1 className="heading3 mb-4">Payment Failed</h1>
                         <p className="text-secondary text-lg mb-8 max-w-md">
-                            We're sorry, but your payment could not be processed. Please try again or use a different payment method.
+                            We&apos;re sorry, but your payment could not be processed. Please try again or use a different payment method.
                         </p>
                         
-                        {error && (
-                            <div className="error-details bg-surface p-6 rounded-lg mb-8 max-w-md w-full">
-                                <h3 className="heading6 mb-4 text-red">Error Details</h3>
-                                <p className="text-sm text-secondary">{error}</p>
-                            </div>
-                        )}
                         
                         <div className="actions flex flex-col sm:flex-row gap-4">
                             <Link href="/checkout" className="button-main">
@@ -60,11 +56,11 @@ const PaymentFailure = () => {
                         <div className="help-section mt-12 text-center">
                             <p className="text-secondary mb-4">Need help? Contact our support team:</p>
                             <div className="contact-info flex flex-col sm:flex-row gap-4 justify-center">
-                                <a href="mailto:support@furniture-store.com" className="text-button hover:underline">
-                                    support@furniture-store.com
+                                <a href="mailto:smeraasinnovate@gmail.com" className="text-button hover:underline">
+                                smeraasinnovate@gmail.com
                                 </a>
                                 <span className="hidden sm:block text-secondary">|</span>
-                                <a href="tel:+1234567890" className="text-button hover:underline">
+                                <a href="tel:+91 8590318931" className="text-button hover:underline">
                                     +1 (234) 567-890
                                 </a>
                             </div>

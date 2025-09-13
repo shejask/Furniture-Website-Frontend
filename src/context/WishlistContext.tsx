@@ -117,7 +117,7 @@ export const WishlistProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             dispatch({ type: 'LOAD_WISHLIST', payload: list });
         });
         return () => unsubscribe();
-    }, [user?.uid]);
+    }, [user, user?.uid]);
 
     return (
         <WishlistContext.Provider value={{ wishlistState, addToWishlist, removeFromWishlist }}>

@@ -295,7 +295,7 @@ const MenuFurniture: React.FC<Props> = ({ props }) => {
                                             <>
                                                 <div className="text-center mb-4">
                                                     <div className="text-black font-medium">Welcome back!</div>
-                                                    <div className="text-secondary text-sm">{user?.email || user?.name || 'User'}</div>
+                                                    <div className="text-secondary text-sm">{user?.email || user?.displayName || 'User'}</div>
                                                 </div>
                                                 <Link href={'/my-account'} className="button-main w-full text-center">My Profile</Link>
                                                 <button 

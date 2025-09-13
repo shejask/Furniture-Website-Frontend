@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 import { ref, get, set, remove, child } from 'firebase/database'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { database, storage } from '@/firebase/config'
 import { fetchVendors, Vendor } from '@/firebase/vendors'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ProductType, ReviewType } from '@/type/ProductType'
 import Product from '../Product'
 import Rate from '@/components/Other/Rate'
@@ -85,7 +86,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     const [reviewErrorMessage, setReviewErrorMessage] = useState<string | null>(null);
     const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
 
-    const fetchCategoryData = async (categoryId: string, retryCount = 0) => {
+    const fetchCategoryData = useCallback(async (categoryId: string, retryCount = 0) => {
         try {
             console.log('🔍 Fetching category data for ID:', categoryId);
             const categoryRef = ref(database, `categories/${categoryId}`);
@@ -127,9 +128,9 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                 setCategoryData(null);
             }
         }
-    };
+    }, []);
 
-    const fetchBrandData = async (brandId: string, retryCount = 0) => {
+    const fetchBrandData = useCallback(async (brandId: string, retryCount = 0) => {
         try {
             console.log('🔍 Fetching brand data for ID:', brandId);
             const brandRef = ref(database, `brands/${brandId}`);
@@ -171,9 +172,9 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                 setBrandData(null);
             }
         }
-    };
+    }, []);
 
-    const fetchVendorData = async (vendorId: string, retryCount = 0) => {
+    const fetchVendorData = useCallback(async (vendorId: string, retryCount = 0) => {
         try {
             console.log('🔍 Fetching vendor data for ID:', vendorId);
             const vendorRef = ref(database, `vendors/${vendorId}`);
@@ -215,84 +216,10 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                 setVendorData(null);
             }
         }
-    };
+    }, []);
 
-    const fetchAttributesData = async (productId: string, retryCount = 0) => {
-        try {
-            if (!productMain?.id) {
-                setAttributesError('Product ID not available');
-                setAttributesData([]);
-                return;
-            }
 
-            // Fetch tags directly from the product
-            const productTagsRef = ref(database, `products/${productMain.id}/tags`);
-            const tagsSnapshot = await get(productTagsRef);
-            
-            if (tagsSnapshot.exists()) {
-                const tagData = tagsSnapshot.val();
-                
-                if (!tagData) {
-                    setAttributesData([]);
-                    setAttributesError(null);
-                    return;
-                }
-
-                // Get all tag IDs
-                const tagIds = Object.keys(tagData);
-
-                // Fetch complete details for each tag
-                const attributesArray: AttributeType[] = [];
-                
-                for (const tagId of tagIds) {
-                    try {
-                        const tagRef = ref(database, `tags/${tagId}`);
-                        const tagSnapshot = await get(tagRef);
-                        
-                        if (tagSnapshot.exists()) {
-                            const tagDetails = tagSnapshot.val();
-                            attributesArray.push({
-                                id: tagId,
-                                name: tagDetails.name,
-                                description: tagDetails.description,
-                                slug: tagDetails.slug,
-                                status: tagDetails.status,
-                                createdAt: tagDetails.createdAt,
-                                updatedAt: tagDetails.updatedAt
-                            });
-                        }
-                    } catch (tagError) {
-                        console.error(`Error fetching tag ${tagId}:`, tagError);
-                        // Continue with other tags even if one fails
-                    }
-                }
-                
-                setAttributesData(attributesArray);
-                setAttributesError(null);
-            } else {
-                if (retryCount < 2) {
-                    setTimeout(() => {
-                        fetchAttributesData(productId, retryCount + 1);
-                    }, 1000);
-                } else {
-                    setAttributesError('No tags found for this product');
-                    setAttributesData([]);
-                }
-            }
-        } catch (error) {
-            console.error('Error fetching product tags:', error);
-            if (retryCount < 2) {
-                setTimeout(() => {
-                    fetchAttributesData(productId, retryCount + 1);
-                }, 1000);
-            } else {
-                setAttributesError('Unable to load product tags. Please try again later.');
-                setAttributesData([]);
-            }
-        }
-    };
-
-    const fetchReviewsData = async (productId: string, retryCount = 0) => {
+    const fetchReviewsData = useCallback(async (productId: string, retryCount = 0) => {
         try {
             setReviewsLoading(true);
             setReviewsError(null);
@@ -348,7 +275,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
         } finally {
             setReviewsLoading(false);
         }
-    };
+    }, []);
 
     const fetchRelatedProducts = async (categoryId: string, currentProductId: string) => {
         try {
@@ -458,13 +385,89 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     const [activeColor, setActiveColor] = useState<string>('')
     const [activeSize, setActiveSize] = useState<string>('')
     const [activeTab, setActiveTab] = useState<string | undefined>('description')
-    const { addToCart, updateCart, cartState } = useCart()
+    const { addToCart, updateCart, cartState, clearCart } = useCart()
     const { openModalCart } = useModalCartContext()
     const { addToWishlist, removeFromWishlist, wishlistState } = useWishlist()
     const { openModalWishlist } = useModalWishlistContext()
     const { addToCompare, removeFromCompare, compareState } = useCompare();
     const { openModalCompare } = useModalCompareContext()
+    const router = useRouter()
     const productMain: ProductType = data.find(product => product.id === productId) as ProductType || data[0] as ProductType
+
+    const fetchAttributesData = useCallback(async (productId: string, retryCount = 0) => {
+        try {
+            if (!productMain?.id) {
+                setAttributesError('Product ID not available');
+                setAttributesData([]);
+                return;
+            }
+
+            // Fetch tags directly from the product
+            const productTagsRef = ref(database, `products/${productMain.id}/tags`);
+            const tagsSnapshot = await get(productTagsRef);
+            
+            if (tagsSnapshot.exists()) {
+                const tagData = tagsSnapshot.val();
+                
+                if (!tagData) {
+                    setAttributesData([]);
+                    setAttributesError(null);
+                    return;
+                }
+
+                // Get all tag IDs
+                const tagIds = Object.keys(tagData);
+
+                // Fetch complete details for each tag
+                const attributesArray: AttributeType[] = [];
+                
+                for (const tagId of tagIds) {
+                    try {
+                        const tagRef = ref(database, `tags/${tagId}`);
+                        const tagSnapshot = await get(tagRef);
+                        
+                        if (tagSnapshot.exists()) {
+                            const tagDetails = tagSnapshot.val();
+                            attributesArray.push({
+                                id: tagId,
+                                name: tagDetails.name,
+                                description: tagDetails.description,
+                                slug: tagDetails.slug,
+                                status: tagDetails.status,
+                                createdAt: tagDetails.createdAt,
+                                updatedAt: tagDetails.updatedAt
+                            });
+                        }
+                    } catch (tagError) {
+                        console.error(`Error fetching tag ${tagId}:`, tagError);
+                        // Continue with other tags even if one fails
+                    }
+                }
+                
+                setAttributesData(attributesArray);
+                setAttributesError(null);
+            } else {
+                if (retryCount < 2) {
+                    setTimeout(() => {
+                        fetchAttributesData(productId, retryCount + 1);
+                    }, 1000);
+                } else {
+                    setAttributesError('No tags found for this product');
+                    setAttributesData([]);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching product tags:', error);
+            if (retryCount < 2) {
+                setTimeout(() => {
+                    fetchAttributesData(productId, retryCount + 1);
+                }, 1000);
+            } else {
+                setAttributesError('Unable to load product tags. Please try again later.');
+                setAttributesData([]);
+            }
+        }
+    }, [productMain?.id]);
 
     const unitPrice = (productMain as any).salePrice ?? productMain?.price;
     const percentSale = Math.floor(100 - ((unitPrice / productMain?.originPrice) * 100))
@@ -521,7 +524,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
             fetchAttributesData(productMain.id);
             fetchReviewsData(productMain.id);
         }
-    }, [productMain?.categories, productMain?.brands, productMain?.id]);
+    }, [productMain, fetchAttributesData, fetchBrandData, fetchCategoryData, fetchReviewsData, fetchVendorData]);
 
     const handleActiveColor = (item: string) => {
         setActiveColor(item)
@@ -555,13 +558,24 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     };
 
     const handleAddToCart = () => {
-        if (!cartState.cartArray.find(item => item.id === productMain.id)) {
-            addToCart({ ...productMain });
-            updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor)
-        } else {
-            updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor)
-        }
+        addToCart({ 
+            ...productMain, 
+            selectedSize: activeSize, 
+            selectedColor: activeColor 
+        });
         openModalCart()
+    };
+
+    const handleBuyNow = () => {
+        // Add the current product to cart
+        addToCart({ 
+            ...productMain, 
+            selectedSize: activeSize, 
+            selectedColor: activeColor 
+        });
+        
+        // Redirect to checkout page with buyNow parameter
+        router.push('/checkout?buyNow=true');
     };
 
     const handleAddToWishlist = () => {
@@ -808,7 +822,7 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     <div onClick={handleAddToCart} className="button-main w-full text-center bg-white text-black border border-black">Add To Cart</div>
                                 </div>
                                 <div className="button-block mt-5">
-                                    <div className="button-main w-full text-center">Buy It Now</div>
+                                    <div onClick={handleBuyNow} className="button-main w-full text-center cursor-pointer">Buy It Now</div>
                                 </div>
                                 <div className="flex items-center lg:gap-20 gap-8 mt-5 pb-6 border-b border-line">
                                     <div className="share flex items-center gap-3 cursor-pointer">

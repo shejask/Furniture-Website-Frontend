@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     const result = await createRazorpayOrder(amount, currency);
 
-    if (result.success) {
+    if (result.success && result.order) {
       return NextResponse.json({
         success: true,
         orderId: result.order.id,

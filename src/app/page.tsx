@@ -29,8 +29,9 @@ export default function Home() {
          <SliderFurniture />
         </div>
 
+ 
 
-        
+          
 
          <CategoriesGrid />
         <FeatureProduct start={0} limit={4} />

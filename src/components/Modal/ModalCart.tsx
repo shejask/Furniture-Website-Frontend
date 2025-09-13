@@ -33,12 +33,11 @@ const ModalCart = () => {
             return;
         }
         
-        if (!cartState.cartArray.find(item => item.id === productItem.id)) {
-            addToCart({ ...productItem });
-            updateCart(productItem.id, productItem.quantityPurchase || 1, '', '')
-        } else {
-            updateCart(productItem.id, productItem.quantityPurchase || 1, '', '')
-        }
+        addToCart({ 
+            ...productItem, 
+            selectedSize: '', 
+            selectedColor: '' 
+        });
     };
 
     const handleActiveTab = (tab: string) => {

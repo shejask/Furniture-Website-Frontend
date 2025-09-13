@@ -13,9 +13,13 @@ import { ProductType } from '@/type/ProductType'
 import BannerTop from '@/components/Home3/BannerTop'
 import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
 import MenuCategory from '@/components/Furniture/MenuCategory'
+import { useAuthState } from 'react-firebase-hooks/auth'
+import { auth } from '@/firebase/config'
 
 export default function BreadCrumb1() {
     const searchParams = useSearchParams()
+    const router = useRouter()
+    const [user, userLoading, authError] = useAuthState(auth)
     let [type,setType] = useState<string | null | undefined>()
     let datatype = searchParams.get('type')
     let gender = searchParams.get('gender')
@@ -26,10 +30,37 @@ export default function BreadCrumb1() {
     const [loading, setLoading] = useState<boolean>(true)
     const [error, setError] = useState<string | null>(null)
     const [vendorName, setVendorName] = useState<string>('Vendor')
+    const [userData, setUserData] = useState<any>(null)
 
     useEffect(() => {
         setType(datatype);
     }, [datatype]);
+
+    // Fetch user data and check if user is a vendor
+    useEffect(() => {
+        const fetchUserData = async () => {
+            if (user) {
+                try {
+                    const userRef = ref(database, `customers/${user.uid}`)
+                    const snapshot = await get(userRef)
+                    if (snapshot.exists()) {
+                        const data = snapshot.val()
+                        setUserData(data)
+                        
+                        // Check if user is a vendor and redirect to admin
+                        if (data.role === 'vendor' || data.userType === 'vendor' || data.isVendor === true) {
+                            router.push('/admin')
+                            return
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching user data:', error)
+                }
+            }
+        }
+        
+        fetchUserData()
+    }, [user, router])
 
     const fetchVendorData = async (vendorId: string) => {
         try {

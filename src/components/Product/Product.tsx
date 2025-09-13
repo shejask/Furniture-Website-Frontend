@@ -46,12 +46,11 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
     }
 
     const handleAddToCart = () => {
-        if (!cartState.cartArray.find(item => item.id === data.id)) {
-            addToCart({ ...data });
-            updateCart(data.id, data.quantityPurchase, activeSize, activeColor)
-        } else {
-            updateCart(data.id, data.quantityPurchase, activeSize, activeColor)
-        }
+        addToCart({ 
+            ...data, 
+            selectedSize: activeSize, 
+            selectedColor: activeColor 
+        });
         openModalCart()
     };
 

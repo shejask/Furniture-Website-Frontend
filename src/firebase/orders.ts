@@ -42,6 +42,8 @@ export interface Order {
   couponCode?: string;
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
+  shiprocketOrderId?: string;
+  shiprocketShipmentId?: string;
   createdAt: string;
   updatedAt: string;
 }

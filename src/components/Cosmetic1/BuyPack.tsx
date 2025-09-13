@@ -15,20 +15,23 @@ const BuyPack = () => {
     const { openModalCart } = useModalCartContext()
 
     const handleAddToCart = () => {
-        if (!cartState.cartArray.find(item => item.id === '43')) {
-            addToCart(productData.find(item => item.id === '43') as ProductType)
-            updateCart('43', 1, '', '')
-        }
+        addToCart({ 
+            ...(productData.find(item => item.id === '43') as ProductType), 
+            selectedSize: '', 
+            selectedColor: '' 
+        });
 
-        if (!cartState.cartArray.find(item => item.id === '44')) {
-            addToCart(productData.find(item => item.id === '44') as ProductType)
-            updateCart('44', 1, '', '')
-        }
+        addToCart({ 
+            ...(productData.find(item => item.id === '44') as ProductType), 
+            selectedSize: '', 
+            selectedColor: '' 
+        });
 
-        if (!cartState.cartArray.find(item => item.id === '42')) {
-            addToCart(productData.find(item => item.id === '42') as ProductType)
-            updateCart('42', 1, '', '')
-        }
+        addToCart({ 
+            ...(productData.find(item => item.id === '42') as ProductType), 
+            selectedSize: '', 
+            selectedColor: '' 
+        });
 
         openModalCart()
     };

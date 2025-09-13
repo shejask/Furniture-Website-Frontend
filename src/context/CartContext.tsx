@@ -21,7 +21,13 @@ interface CartState {
 }
 
 type CartAction =
-    | { type: 'ADD_TO_CART'; payload: ProductType }
+    | { 
+        type: 'ADD_TO_CART'; 
+        payload: ProductType & { 
+            selectedSize?: string; 
+            selectedColor?: string; 
+        } 
+    }
     | { type: 'REMOVE_FROM_CART'; payload: string }
     | {
         type: 'UPDATE_CART'; payload: {
@@ -33,7 +39,7 @@ type CartAction =
 
 interface CartContextProps {
     cartState: CartState;
-    addToCart: (item: ProductType) => Promise<boolean>; // Return boolean to indicate success/failure
+    addToCart: (item: ProductType & { selectedSize?: string; selectedColor?: string }) => Promise<boolean>; // Return boolean to indicate success/failure
     removeFromCart: (itemId: string) => void;
     updateCart: (itemId: string, quantity: number, selectedSize: string, selectedColor: string) => void;
     clearCart: () => void;
@@ -45,11 +51,32 @@ const CartContext = createContext<CartContextProps | undefined>(undefined);
 const cartReducer = (state: CartState, action: CartAction): CartState => {
     switch (action.type) {
         case 'ADD_TO_CART':
-            const newItem: CartItem = { ...action.payload, quantity: 1, selectedSize: '', selectedColor: '' };
-            return {
-                ...state,
-                cartArray: [...state.cartArray, newItem],
-            };
+            const existingItemIndex = state.cartArray.findIndex(item => item.id === action.payload.id);
+            
+            if (existingItemIndex !== -1) {
+                // Product already exists, increment quantity
+                const updatedCartArray = [...state.cartArray];
+                updatedCartArray[existingItemIndex] = {
+                    ...updatedCartArray[existingItemIndex],
+                    quantity: updatedCartArray[existingItemIndex].quantity + 1
+                };
+                return {
+                    ...state,
+                    cartArray: updatedCartArray,
+                };
+            } else {
+                // Product doesn't exist, add new item
+                const newItem: CartItem = { 
+                    ...action.payload, 
+                    quantity: 1, 
+                    selectedSize: action.payload.selectedSize || '', 
+                    selectedColor: action.payload.selectedColor || '' 
+                };
+                return {
+                    ...state,
+                    cartArray: [...state.cartArray, newItem],
+                };
+            }
         case 'REMOVE_FROM_CART':
             return {
                 ...state,
@@ -92,27 +119,61 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 export const CartProviderWithSync: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [cartState, dispatch] = useReducer(cartReducer, { cartArray: [] });
     const [user] = useAuthState(auth);
+    const [isInitialized, setIsInitialized] = useState(false);
     const router = useRouter();
 
     const requireLogin = () => {
         router.push('/login');
     };
 
+    // Save cart to localStorage whenever cart changes (for non-logged in users)
+    // Skip saving on initial load to prevent overwriting loaded data
+    useEffect(() => {
+        if (!user && isInitialized) {
+            console.log('Saving cart to localStorage:', cartState.cartArray);
+            localStorage.setItem('cart', JSON.stringify(cartState.cartArray));
+        }
+    }, [cartState.cartArray, user, isInitialized]);
 
-
-    // Sync with Firebase when user changes
+    // Load cart from localStorage on mount and sync with Firebase when user changes
     useEffect(() => {
         if (!user) {
-            // User logged out, clear cart
-            dispatch({ type: 'LOAD_CART', payload: [] });
+            // User not logged in, load from localStorage
+            const savedCart = localStorage.getItem('cart');
+            console.log('Loading cart from localStorage:', savedCart);
+            if (savedCart) {
+                try {
+                    const parsedCart = JSON.parse(savedCart);
+                    console.log('Parsed cart from localStorage:', parsedCart);
+                    dispatch({ type: 'LOAD_CART', payload: parsedCart });
+                } catch (error) {
+                    console.error('Error loading cart from localStorage:', error);
+                    dispatch({ type: 'LOAD_CART', payload: [] });
+                }
+            } else {
+                console.log('No saved cart found in localStorage');
+                dispatch({ type: 'LOAD_CART', payload: [] });
+            }
+            setIsInitialized(true);
             return;
+        }
+
+        // User logged in - merge local cart with Firebase cart
+        const savedCart = localStorage.getItem('cart');
+        let localCart: any[] = [];
+        if (savedCart) {
+            try {
+                localCart = JSON.parse(savedCart);
+            } catch (error) {
+                console.error('Error parsing local cart:', error);
+            }
         }
 
         // Listen to Firebase cart changes
         const productsRef = ref(database, `/customers/${user.uid}/cart/products`);
         const off = onValue(productsRef, (snapshot) => {
             const productsObj = snapshot.val() || {};
-            const items = Object.values(productsObj).map((p: any) => {
+            const firebaseItems = Object.values(productsObj).map((p: any) => {
                 const thumbnail = p?.thumbnail || '';
                 const images = thumbnail ? [thumbnail] : [];
                 const fallbackNumber = (n: any, def = 0) => (typeof n === 'number' && !isNaN(n) ? n : def);
@@ -145,32 +206,59 @@ export const CartProviderWithSync: React.FC<{ children: React.ReactNode }> = ({ 
                     selectedColor: p?.selectedColor || ''
                 } as any;
             });
-            dispatch({ type: 'LOAD_CART', payload: items });
+
+            // Merge local cart with Firebase cart
+            const mergedCart = [...firebaseItems];
+            
+            // Add local cart items that don't exist in Firebase
+            localCart.forEach((localItem: any) => {
+                const existsInFirebase = firebaseItems.some((firebaseItem: any) => firebaseItem.id === localItem.id);
+                if (!existsInFirebase) {
+                    mergedCart.push({
+                        ...localItem,
+                        quantity: localItem.quantity || 1,
+                        selectedSize: localItem.selectedSize || '',
+                        selectedColor: localItem.selectedColor || ''
+                    });
+                }
+            });
+
+            dispatch({ type: 'LOAD_CART', payload: mergedCart });
+            setIsInitialized(true);
+            
+            // Clear localStorage since we're now synced with Firebase
+            localStorage.removeItem('cart');
+            
+            // Save merged cart to Firebase
+            if (mergedCart.length > 0) {
+                overwriteFirebaseCartFromItems(user.uid, mergedCart).catch(error => {
+                    console.error('Error saving merged cart to Firebase:', error);
+                });
+            }
         });
         return () => off();
-    }, [user?.uid]);
+    }, [user, user?.uid]);
 
 
 
     const addToCart = async (item: ProductType): Promise<boolean> => {
-        // Check if user is logged in
-        if (!user) {
-            // User not logged in, redirect to login page
-            router.push('/login');
-            return false;
-        }
-
-        // User is logged in, add to cart
+        console.log('Adding to cart:', item, 'User logged in:', !!user);
+        // Add to cart regardless of login status
         dispatch({ type: 'ADD_TO_CART', payload: item });
         
-        // Save to Firebase for authenticated users
-        try {
-            await addOrUpdateFirebaseCartItem(user.uid, item, 1, '', '');
-            return true;
-        } catch (e) {
-            console.error('Error saving to Firebase:', e);
-            return false;
+        // Save to Firebase only for authenticated users
+        if (user) {
+            try {
+                await addOrUpdateFirebaseCartItem(user.uid, item, 1, '', '');
+                return true;
+            } catch (e) {
+                console.error('Error saving to Firebase:', e);
+                return false;
+            }
         }
+        
+        // For non-logged in users, cart is saved to localStorage via useEffect
+        return true;
     };
 
     const removeFromCart = (itemId: string) => {

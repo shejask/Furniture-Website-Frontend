@@ -12,6 +12,8 @@ import { useCart } from '@/context/CartContext'
 import { countdownTime } from '@/store/countdownTime'
 import { getCouponByCode, computeCouponDiscount, CouponRecord } from '@/firebase/coupons'
 import BannerTop from '@/components/Home3/BannerTop'
+import { useAuthState } from 'react-firebase-hooks/auth'
+import { auth } from '@/firebase/config'
 
 
 import MenuFurniture from '@/components/Header/Menu/MenuFurniture'
@@ -22,6 +24,7 @@ import SliderFurniture from '@/components/Slider/SliderFurniture'
 const Cart = () => {
     const [timeLeft, setTimeLeft] = useState(countdownTime());
     const router = useRouter()
+    const [user, userLoading] = useAuthState(auth);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -44,13 +47,11 @@ const Cart = () => {
         }
     };
 
-    let moneyForFreeship = 150;
     let [totalCart, setTotalCart] = useState<number>(0)
     let [discountCart, setDiscountCart] = useState<number>(0)
     const [couponCode, setCouponCode] = useState<string>('')
     const [couponError, setCouponError] = useState<string>('')
     const [appliedCoupon, setAppliedCoupon] = useState<CouponRecord | null>(null)
-    let [shipCart, setShipCart] = useState<number>(30)
     let [applyCode, setApplyCode] = useState<number>(0)
 
     cartState.cartArray.map(item => totalCart += ((item as any).salePrice ?? item.price) * item.quantity)
@@ -104,16 +105,13 @@ const Cart = () => {
         discountCart = 0
     }
 
-    if (totalCart < moneyForFreeship) {
-        shipCart = 30
-    }
-
-    if (cartState.cartArray.length === 0) {
-        shipCart = 0
-    }
-
     const redirectToCheckout = () => {
-        router.push(`/checkout?discount=${discountCart}&ship=${shipCart}`)
+        // Check if user is logged in before proceeding to checkout
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+        router.push(`/checkout?discount=${discountCart}`)
     }
 
     return (
@@ -219,9 +217,9 @@ const Cart = () => {
                                 </div>
                                 {couponError && <div className='caption1 text-red mt-2'>{couponError}</div>}
                                 {appliedCoupon && !couponError && (
-                                    <div className='caption1 text-black mt-2 flex items-center gap-3'>
-                                        <span>Coupon <strong>{appliedCoupon.code}</strong> applied. You save ₹{discountCart}.00</span>
-                                        <button type='button' onClick={handleClearCoupon} className='underline text-red'>Remove</button>
+                                    <div className='caption1 text-green font-medium mt-2 flex items-center gap-3 bg-green/10 p-2 rounded-lg'>
+                                        <span>✅ Coupon <strong>{appliedCoupon.code}</strong> applied. You save ₹{discountCart}.00</span>
+                                        <button type='button' onClick={handleClearCoupon} className='underline text-red hover:text-red-700'>Remove</button>
                                     </div>
                                 )}
                             </div>
@@ -238,64 +236,10 @@ const Cart = () => {
                                     <div className="text-title">Discounts</div>
                                     <div className="text-title"> <span>-₹</span><span className="discount">{discountCart}</span><span>.00</span></div>
                                 </div>
-                                <div className="ship-block py-5 flex justify-between border-b border-line">
-                                    <div className="text-title">Shipping</div>
-                                    <div className="choose-type flex gap-12">
-                                        <div className="left">
-                                            <div className="type">
-                                                {moneyForFreeship - totalCart > 0 ?
-                                                    (
-                                                        <input
-                                                            id="shipping"
-                                                            type="radio"
-                                                            name="ship"
-                                                            disabled
-                                                        />
-                                                    ) : (
-                                                        <input
-                                                            id="shipping"
-                                                            type="radio"
-                                                            name="ship"
-                                                            checked={shipCart === 0}
-                                                            onChange={() => setShipCart(0)}
-                                                        />
-                                                    )}
-                                                < label className="pl-1" htmlFor="shipping">Free Shipping:</label>
-                                            </div>
-                                            <div className="type mt-1">
-                                                <input
-                                                    id="local"
-                                                    type="radio"
-                                                    name="ship"
-                                                    value={30}
-                                                    checked={shipCart === 30}
-                                                    onChange={() => setShipCart(30)}
-                                                />
-                                                <label className="text-on-surface-variant1 pl-1" htmlFor="local">Local:</label>
-                                            </div>
-                                            <div className="type mt-1">
-                                                <input
-                                                    id="flat"
-                                                    type="radio"
-                                                    name="ship"
-                                                    value={40}
-                                                    checked={shipCart === 40}
-                                                    onChange={() => setShipCart(40)}
-                                                />
-                                                <label className="text-on-surface-variant1 pl-1" htmlFor="flat">Flat Rate:</label>
-                                            </div>
-                                        </div>
-                                        <div className="right">
-                                            <div className="ship">₹0.00</div>
-                                            <div className="local text-on-surface-variant1 mt-1">₹30.00</div>
-                                            <div className="flat text-on-surface-variant1 mt-1">₹40.00</div>
-                                        </div>
-                                    </div>
-                                </div>
                                 <div className="total-cart-block pt-4 pb-4 flex justify-between">
                                     <div className="heading5">Total</div>
                                     <div className="heading5">₹
-                                        <span className="total-cart heading5">{totalCart - discountCart + shipCart}</span>
+                                        <span className="total-cart heading5">{totalCart - discountCart}</span>
                                         <span className='heading5'>.00</span></div>
                                 </div>
                                 <div className="block-button flex flex-col items-center gap-y-4 mt-5">

@@ -82,12 +82,11 @@ const Sale: React.FC<Props> = ({ data, productId }) => {
     };
 
     const handleAddToCart = () => {
-        if (!cartState.cartArray.find(item => item.id === productMain.id)) {
-            addToCart({ ...productMain });
-            updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor)
-        } else {
-            updateCart(productMain.id, productMain.quantityPurchase, activeSize, activeColor)
-        }
+        addToCart({ 
+            ...productMain, 
+            selectedSize: activeSize, 
+            selectedColor: activeColor 
+        });
         openModalCart()
     };
     const handleAddToWishlist = () => {

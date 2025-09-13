@@ -62,12 +62,11 @@ const ModalQuickview = () => {
 
     const handleAddToCart = () => {
         if (selectedProduct) {
-            if (!cartState.cartArray.find(item => item.id === selectedProduct.id)) {
-                addToCart({ ...selectedProduct });
-                updateCart(selectedProduct.id, selectedProduct.quantityPurchase, activeSize, activeColor)
-            } else {
-                updateCart(selectedProduct.id, selectedProduct.quantityPurchase, activeSize, activeColor)
-            }
+            addToCart({ 
+                ...selectedProduct, 
+                selectedSize: activeSize, 
+                selectedColor: activeColor 
+            });
             openModalCart()
             closeQuickview()
         }

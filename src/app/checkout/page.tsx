@@ -17,6 +17,8 @@ import { auth } from '@/firebase/config'
 import { useAddresses } from '@/hooks/useAddresses'
 import { Address, getUserAddresses } from '@/firebase/addresses'
 import { saveOrder, Order, OrderItem, OrderAddress } from '@/firebase/orders'
+import { getShippingRates, getShippingCostForCitySync, ShippingData } from '@/firebase/shipping'
+import { getCouponByCode, computeCouponDiscount, CouponRecord } from '@/firebase/coupons'
 import { ref, set } from 'firebase/database'
 import { database } from '@/firebase/config'
 
@@ -25,9 +27,14 @@ const Checkout = () => {
     const searchParams = useSearchParams()
     let discount = searchParams.get('discount')
     let ship = searchParams.get('ship')
-    let couponCode = searchParams.get('coupon') || searchParams.get('couponCode')
+    let buyNow = searchParams.get('buyNow')
 
     const { cartState, clearCart } = useCart();
+    
+    // Filter cart items for Buy Now mode - show only the most recently added item
+    const displayCartItems = buyNow === 'true' && cartState.cartArray.length > 0 
+        ? [cartState.cartArray[cartState.cartArray.length - 1]] // Show only the last added item
+        : cartState.cartArray; // Show all items in normal mode
     const { initiatePayment, isLoading, error } = useRazorpay();
     const [user, userLoading, authError] = useAuthState(auth);
     const { addresses, loading: addressLoading, addAddress, editAddress, makeDefault, getDefaultAddress, refreshAddresses, removeAddress } = useAddresses();
@@ -40,8 +47,7 @@ const Checkout = () => {
         console.log('Debug - Address loading:', addressLoading);
         console.log('Debug - Discount:', discount);
         console.log('Debug - Shipping:', ship);
-        console.log('Debug - Coupon Code:', couponCode);
-    }, [userLoading, user, addresses, addressLoading, discount, ship, couponCode]);
+    }, [userLoading, user, addresses, addressLoading, discount, ship]);
 
     // Test Firebase connection on component mount
     React.useEffect(() => {
@@ -68,6 +74,22 @@ const Checkout = () => {
     const [saveAddress, setSaveAddress] = useState<boolean>(true)
     const [orderNote, setOrderNote] = useState<string>('')
     const [message, setMessage] = useState<{type: 'success' | 'error' | 'info', text: string} | null>(null)
+    const [shippingData, setShippingData] = useState<ShippingData>({})
+    const [currentShippingCost, setCurrentShippingCost] = useState<number>(0)
+    const [isFreeShippingApplied, setIsFreeShippingApplied] = useState<boolean>(false)
+    const [couponCode, setCouponCode] = useState<string>('')
+    const [couponError, setCouponError] = useState<string>('')
+    const [appliedCoupon, setAppliedCoupon] = useState<CouponRecord | null>(null)
+    const [discountAmount, setDiscountAmount] = useState<number>(0)
+    
+    
+    // Initialize shipping cost on component mount
+    React.useEffect(() => {
+        if (currentShippingCost === null || currentShippingCost === undefined) {
+            console.log('Initializing shipping cost to 0');
+            setCurrentShippingCost(0);
+        }
+    }, [currentShippingCost]);
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -124,6 +146,10 @@ const Checkout = () => {
         setSelectedAddress(address)
         populateFormWithAddress(address)
         setShowAddressForm(false)
+        
+        // Calculate shipping cost based on city and state
+        const shippingCost = getShippingCostForCitySync(address.city, address.state, shippingData, address.country);
+        setCurrentShippingCost(shippingCost);
     }
 
     const handleNewAddress = () => {
@@ -226,21 +252,98 @@ const Checkout = () => {
         }
     }
 
+    // Load shipping data on component mount
+    React.useEffect(() => {
+        const loadShippingData = async () => {
+            try {
+                console.log('Loading shipping data...');
+                const data = await getShippingRates();
+                console.log('Shipping data loaded successfully:', data);
+                setShippingData(data);
+                
+                // If we have shipping data and a selected address, calculate shipping
+                if (Object.keys(data).length > 0 && selectedAddress) {
+                    console.log('Recalculating shipping for selected address after data load');
+                    const shippingCost = getShippingCostForCitySync(selectedAddress.city, selectedAddress.state, data, selectedAddress.country);
+                    setCurrentShippingCost(shippingCost);
+                }
+            } catch (error) {
+                console.error('Error loading shipping data:', error);
+                setCurrentShippingCost(50); // Set default if loading fails
+            }
+        };
+        
+        loadShippingData();
+    }, [selectedAddress]);
+
     // Calculate total cart amount properly
-    const calculatedTotalCart = cartState.cartArray.reduce((total, item) => {
+    const calculatedTotalCart = displayCartItems.reduce((total, item) => {
         return total + (((item as any).salePrice ?? item.price) * item.quantity);
     }, 0);
-    const finalAmount = calculatedTotalCart - Number(discount) + Number(ship)
+    const finalAmount = calculatedTotalCart - discountAmount + (isFreeShippingApplied ? 0 : (currentShippingCost || 0))
+
+    const handleApplyCoupon = async () => {
+        setCouponError('')
+        try {
+            const record = await getCouponByCode(couponCode?.trim() || '');
+            if (!record) {
+                setCouponError('Invalid coupon code');
+                setDiscountAmount(0);
+                setAppliedCoupon(null);
+                setIsFreeShippingApplied(false);
+                return;
+            }
+            
+            const { valid, reason, discount, isFreeShipping } = computeCouponDiscount(calculatedTotalCart, record);
+            if (!valid) {
+                setCouponError(reason || 'Coupon not applicable');
+                setDiscountAmount(0);
+                setAppliedCoupon(null);
+                setIsFreeShippingApplied(false);
+                return;
+            }
+            
+            setDiscountAmount(discount);
+            setIsFreeShippingApplied(isFreeShipping);
+            setAppliedCoupon(record);
+            
+            if (isFreeShipping) {
+                showMessage('success', `Free shipping applied! Code: ${record.code}`);
+            } else {
+                showMessage('success', `Coupon applied! You save ₹${discount}.00`);
+            }
+        } catch (e) {
+            setCouponError('Failed to apply coupon');
+            setDiscountAmount(0);
+            setAppliedCoupon(null);
+            setIsFreeShippingApplied(false);
+        }
+    }
+
+    const handleClearCoupon = () => {
+        setAppliedCoupon(null);
+        setDiscountAmount(0);
+        setIsFreeShippingApplied(false);
+        setCouponError('');
+        setCouponCode('');
+    }
 
     const handlePayment = (item: string) => {
         setActivePayment(item)
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        setFormData({
+        const newFormData = {
             ...formData,
             [e.target.id]: e.target.value
-        })
+        };
+        setFormData(newFormData);
+        
+        // If city or state is being changed, update shipping cost
+        if ((e.target.id === 'city' || e.target.id === 'state') && newFormData.city && newFormData.state) {
+            const shippingCost = getShippingCostForCitySync(newFormData.city, newFormData.state, shippingData, newFormData.country);
+            setCurrentShippingCost(shippingCost);
+        }
     }
 
     const createOrderData = (paymentMethod: 'razorpay' | 'cash-delivery', razorpayPaymentId?: string, razorpayOrderId?: string): Omit<Order, 'id' | 'createdAt' | 'updatedAt'> => {
@@ -251,7 +354,7 @@ const Checkout = () => {
         const orderId = razorpayOrderId || `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         // Convert cart items to order items
-        const orderItems: OrderItem[] = cartState.cartArray.map((item) => {
+        const orderItems: OrderItem[] = displayCartItems.map((item) => {
             const orderItem: any = {
                 id: item.id,
                 name: item.name,
@@ -310,8 +413,8 @@ const Checkout = () => {
             paymentStatus: paymentMethod === 'razorpay' ? 'completed' : 'pending',
             orderStatus: 'pending',
             subtotal: calculatedTotalCart,
-            discount: Number(discount) || 0,
-            shipping: Number(ship) || 0,
+            discount: discountAmount,
+            shipping: isFreeShippingApplied ? 0 : currentShippingCost,
             total: finalAmount
         };
 
@@ -320,8 +423,12 @@ const Checkout = () => {
             orderData.orderNote = orderNote.trim();
         }
         
-        if (couponCode && couponCode.trim()) {
-            orderData.couponCode = couponCode.trim();
+        if (appliedCoupon && appliedCoupon.code) {
+            orderData.couponCode = appliedCoupon.code;
+            orderData.couponType = appliedCoupon.type;
+            if (isFreeShippingApplied) {
+                orderData.freeShippingApplied = true;
+            }
         }
         
         if (razorpayPaymentId) {
@@ -498,6 +605,13 @@ const Checkout = () => {
         }
     }
 
+    // Redirect to login if user is not authenticated
+    React.useEffect(() => {
+        if (!userLoading && !user) {
+            router.push('/login');
+        }
+    }, [userLoading, user, router]);
+
     if (userLoading) {
     return (
         <>
@@ -513,6 +627,31 @@ const Checkout = () => {
                             <div className="text-center">
                                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
                                 <p className="text-secondary">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <Footer />
+            </>
+        )
+    }
+
+    // Show loading if user is not authenticated (will redirect)
+    if (!user) {
+        return (
+            <>
+                <div id="header" className='relative w-full'>
+                    <BannerTop props="bg-green py-3" textColor='text-black' bgLine='bg-black' />
+                    <MenuFurniture props="bg-white" />
+                    <MenuCategory />
+                    <Breadcrumb heading='Checkout' subHeading='Checkout' />
+                </div>
+                <div className="cart-block md:py-20 py-10">
+                    <div className="container">
+                        <div className="flex items-center justify-center min-h-[400px]">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                                <p className="text-secondary">Redirecting to login...</p>
                             </div>
                         </div>
                     </div>
@@ -668,7 +807,7 @@ const Checkout = () => {
                                             </button>
                                         </div>
                                     </div>
-                                ) : user && !addressLoading && addresses.length === 0 ? (
+                                ) : user && !addressLoading && addresses.length === 0 && !showAddressForm ? (
                                     /* No addresses - show empty state with add button */
                                     <div className="no-addresses mt-4">
                                         <div className="text-center py-8">
@@ -839,6 +978,50 @@ const Checkout = () => {
                                 ) : null}
                                                             </div>
                             
+                            {/* Coupon Section */}
+                            <div className="coupon-section mt-6">
+                                <div className="heading5">Coupon Code</div>
+                                <div className="coupon-input-block mt-4">
+                                    <div className="flex gap-2">
+                                        <input 
+                                            value={couponCode || ''} 
+                                            onChange={(e) => setCouponCode(e.target.value)} 
+                                            type="text" 
+                                            placeholder="Enter coupon code" 
+                                            className="flex-1 h-12 bg-surface pl-4 pr-4 rounded-lg border border-line" 
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={handleApplyCoupon} 
+                                            className="button-main h-12 px-5 rounded-lg flex items-center justify-center bg-green text-black"
+                                        >
+                                            Apply
+                                        </button>
+                                    </div>
+                                    {couponError && (
+                                        <div className="caption1 text-red mt-2">{couponError}</div>
+                                    )}
+                                    {appliedCoupon && !couponError && (
+                                        <div className="caption1 text-black mt-2 flex items-center gap-3">
+                                            <span>
+                                                {isFreeShippingApplied ? (
+                                                    <>Free shipping coupon <strong>{appliedCoupon.code}</strong> applied</>
+                                                ) : (
+                                                    <>Coupon <strong>{appliedCoupon.code}</strong> applied. You save ₹{discountAmount}.00</>
+                                                )}
+                                            </span>
+                                            <button 
+                                                type="button" 
+                                                onClick={handleClearCoupon} 
+                                                className="underline text-red"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            
                             {/* Order Notes Section */}
                             <div className="order-notes mt-6">
                                 <div className="heading5">Order Notes (Optional)</div>
@@ -894,12 +1077,19 @@ const Checkout = () => {
                         {/* Order Summary */}
                         <div className="xl:w-1/3 xl:pl-12 w-full">
                             <div className="checkout-block bg-surface p-6 rounded-2xl">
-                                <div className="heading5 pb-3">Your Order</div>
+                                <div className="heading5 pb-3">
+                                    {buyNow === 'true' ? 'Buy Now - Your Order' : 'Your Order'}
+                                </div>
+                                {buyNow === 'true' && (
+                                    <div className="text-sm text-green mb-3 p-2 bg-green/10 rounded-lg">
+                                        ⚡ Quick Buy: You&apos;re purchasing this item immediately
+                                    </div>
+                                )}
                                 <div className="list-product-checkout">
-                                    {cartState.cartArray.length < 1 ? (
+                                    {displayCartItems.length < 1 ? (
                                         <p className='text-button pt-3'>No product in cart</p>
                                     ) : (
-                                        cartState.cartArray.map((product) => (
+                                        displayCartItems.map((product) => (
                                             <div key={product.id} className="item flex items-center justify-between w-full pb-5 border-b border-line gap-6 mt-5">
                                                     <div className="bg-img w-[100px] aspect-square flex-shrink-0 rounded-lg overflow-hidden">
                                                         <Image
@@ -936,15 +1126,35 @@ const Checkout = () => {
                                 <div className="discount-block py-5 flex justify-between border-b border-line">
                                     <div className="text-title">
                                         Discounts
-                                        {couponCode && (
-                                            <div className="text-xs text-green mt-1">Code: {couponCode}</div>
+                                        {appliedCoupon && (
+                                            <div className="text-xs text-green mt-1">Code: {appliedCoupon.code}</div>
                                         )}
                                     </div>
-                                    <div className="text-title">-₹<span className="discount">{discount}</span><span>.00</span></div>
+                                    <div className="text-title">-₹<span className="discount">{discountAmount}</span><span>.00</span></div>
                                 </div>
                                 <div className="ship-block py-5 flex justify-between border-b border-line">
                                     <div className="text-title">Shipping</div>
-                                    <div className="text-title">{Number(ship) === 0 ? 'Free' : `₹${ship}.00`}</div>
+                                    <div className="text-title">
+                                        {isFreeShippingApplied ? (
+                                            <>
+                                                <span className="text-green">Free</span>
+                                                {appliedCoupon && (
+                                                    <div className="text-xs text-green mt-1">
+                                                        Applied: {appliedCoupon.code}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                {!currentShippingCost || currentShippingCost === 0 ? 'Free' : `₹${currentShippingCost}.00`}
+                                                {selectedAddress && (
+                                                    <div className="text-xs text-secondary mt-1">
+                                                        to {selectedAddress.city}, {selectedAddress.state}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="total-cart-block pt-5 flex justify-between">
                                     <div className="heading5">Total</div>
