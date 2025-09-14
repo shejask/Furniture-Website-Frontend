@@ -21,7 +21,7 @@ import { getShippingRates, getShippingCostForCitySync, ShippingData } from '@/fi
 import { getCouponByCode, computeCouponDiscount, CouponRecord } from '@/firebase/coupons'
 import { ref, set } from 'firebase/database'
 import { database } from '@/firebase/config'
-import locationsData from '@/components/data/locations.json'
+import { locationsData } from '@/components/data/locations'
 
 const Checkout = () => {
     const router = useRouter()
@@ -99,10 +99,34 @@ const Checkout = () => {
 
     // Initialize location dropdowns on component mount
     React.useEffect(() => {
-        // Set up India as default country
-        const india = locationsData.countries.find(c => c.name === 'India')
-        if (india) {
-            setAvailableStates(india.states)
+        console.log('Debug - locationsData:', locationsData)
+        console.log('Debug - locationsData type:', typeof locationsData)
+        console.log('Debug - countries:', locationsData?.countries)
+        
+        // Hardcode states for testing
+        const hardcodedStates = [
+            { name: "Andhra Pradesh", code: "AP", cities: ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool"] },
+            { name: "Karnataka", code: "KA", cities: ["Bangalore", "Mysore", "Hubli", "Mangalore", "Belgaum"] },
+            { name: "Kerala", code: "KL", cities: ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Palakkad"] },
+            { name: "Maharashtra", code: "MH", cities: ["Mumbai", "Pune", "Nagpur", "Thane", "Nashik"] },
+            { name: "Tamil Nadu", code: "TN", cities: ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem"] },
+            { name: "Gujarat", code: "GJ", cities: ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar"] },
+            { name: "Rajasthan", code: "RJ", cities: ["Jaipur", "Jodhpur", "Udaipur", "Kota", "Bikaner"] },
+            { name: "West Bengal", code: "WB", cities: ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri"] },
+            { name: "Uttar Pradesh", code: "UP", cities: ["Lucknow", "Kanpur", "Agra", "Varanasi", "Meerut"] },
+            { name: "Madhya Pradesh", code: "MP", cities: ["Bhopal", "Indore", "Gwalior", "Jabalpur", "Ujjain"] }
+        ]
+        
+        setSelectedCountry('India')
+        setAvailableStates(hardcodedStates)
+        console.log('Debug - Hardcoded states set:', hardcodedStates)
+        
+        // Also try the original method
+        if (locationsData && locationsData.countries) {
+            const india = locationsData.countries.find(c => c.name === 'India')
+            if (india) {
+                console.log('Debug - Original method also working:', india.states)
+            }
         }
     }, []);
 
@@ -408,30 +432,59 @@ const Checkout = () => {
         const stateName = e.target.value
         setSelectedState(stateName)
         
-        // Find and set available cities for selected state
-        const state = availableStates.find(s => s.name === stateName)
-        if (state) {
-            setAvailableCities(state.cities)
-            // Auto-select the first city
-            const firstCity = state.cities[0]
-            setFormData(prev => ({
-                ...prev,
-                state: stateName,
-                city: firstCity
-            }))
-            
-            // Update shipping cost with first city
-            if (firstCity && selectedCountry) {
-                const shippingCost = getShippingCostForCitySync(firstCity, stateName, shippingData, selectedCountry);
-                setCurrentShippingCost(shippingCost);
+        // Find cities from locations.json for the selected state
+        const india = locationsData.countries.find(c => c.name === 'India')
+        if (india) {
+            const state = india.states.find(s => s.name === stateName)
+            if (state) {
+                setAvailableCities(state.cities)
+                // Auto-select the first city
+                const firstCity = state.cities[0]
+                setFormData(prev => ({
+                    ...prev,
+                    state: stateName,
+                    city: firstCity
+                }))
+                
+                // Update shipping cost with first city
+                if (firstCity && selectedCountry) {
+                    const shippingCost = getShippingCostForCitySync(firstCity, stateName, shippingData, selectedCountry);
+                    setCurrentShippingCost(shippingCost);
+                }
+                console.log('Debug - Cities loaded for', stateName, ':', state.cities)
+            } else {
+                setAvailableCities([])
+                setFormData(prev => ({
+                    ...prev,
+                    state: stateName,
+                    city: ''
+                }))
             }
         } else {
-            setAvailableCities([])
-            setFormData(prev => ({
-                ...prev,
-                state: stateName,
-                city: ''
-            }))
+            // Fallback to hardcoded states
+            const state = availableStates.find(s => s.name === stateName)
+            if (state) {
+                setAvailableCities(state.cities)
+                const firstCity = state.cities[0]
+                setFormData(prev => ({
+                    ...prev,
+                    state: stateName,
+                    city: firstCity
+                }))
+                
+                // Update shipping cost with first city
+                if (firstCity && selectedCountry) {
+                    const shippingCost = getShippingCostForCitySync(firstCity, stateName, shippingData, selectedCountry);
+                    setCurrentShippingCost(shippingCost);
+                }
+            } else {
+                setAvailableCities([])
+                setFormData(prev => ({
+                    ...prev,
+                    state: stateName,
+                    city: ''
+                }))
+            }
         }
     }
 
@@ -1006,37 +1059,14 @@ const Checkout = () => {
                                                     <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
                                                         Country *
                                                     </label>
-                                                    <select 
-                                                        className="border-line px-4 py-3 w-full rounded-lg bg-white" 
+                                                    <input 
+                                                        className="border-line px-4 py-3 w-full rounded-lg bg-gray-100" 
                                                         id="country" 
                                                         name="country"
-                                                        value={selectedCountry}
-                                                        onChange={handleCountryChange}
-                                                        required 
-                                                    >
-                                                        <option value="India">India</option>
-                                                    </select>
-                                                </div>
-                                                <div className="">
-                                                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                                                        City *
-                                                    </label>
-                                                    <select 
-                                                        className="border-line px-4 py-3 w-full rounded-lg bg-white" 
-                                                        id="city" 
-                                                        name="city"
-                                                        value={formData.city}
-                                                        onChange={handleCityChange}
-                                                        required 
-                                                        disabled={availableCities.length === 0}
-                                                    >
-                                                        <option value="">Select City</option>
-                                                        {availableCities.map((city) => (
-                                                            <option key={city} value={city}>
-                                                                {city}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                        value="India"
+                                                        readOnly
+                                                        disabled
+                                                    />
                                                 </div>
                                                 <div className="select-block">
                                                     <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
@@ -1051,7 +1081,7 @@ const Checkout = () => {
                                                         required
                                                         disabled={availableStates.length === 0}
                                                     >
-                                                        <option value="">Select State</option>
+                                                        <option value="">Select State (Debug: {availableStates.length} states)</option>
                                                         {availableStates.map((state) => (
                                                             <option key={state.code} value={state.name}>
                                                                 {state.name}
@@ -1059,6 +1089,27 @@ const Checkout = () => {
                                                         ))}
                                                     </select>
                                                     <Icon.CaretDown className='arrow-down' />
+                                                </div>
+                                                <div className="">
+                                                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                                                        City *
+                                                    </label>
+                                                    <select 
+                                                        className="border-line px-4 py-3 w-full rounded-lg bg-white" 
+                                                        id="city" 
+                                                        name="city"
+                                                        value={formData.city}
+                                                        onChange={handleCityChange}
+                                                        required 
+                                                        disabled={availableCities.length === 0}
+                                                    >
+                                                        <option value="">Select City ({availableCities.length} cities available)</option>
+                                                        {availableCities.map((city) => (
+                                                            <option key={city} value={city}>
+                                                                {city}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div className="">
                                                     <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-1">
