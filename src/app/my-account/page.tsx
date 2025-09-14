@@ -12,6 +12,7 @@ import BannerTop from '@/components/Home3/BannerTop'
 import { useAuthState } from 'react-firebase-hooks/auth'
 import { auth } from '@/firebase/config'
 import { getCustomerOrders, Order, updateOrderStatus } from '@/firebase/orders'
+import locationsData from '@/components/data/locations.json'
 
 interface Address {
     id: string
@@ -66,6 +67,12 @@ const MyAccount = () => {
         zip: '',
         phone: ''
     })
+
+    // Location dropdown states
+    const [selectedCountry, setSelectedCountry] = useState('')
+    const [selectedState, setSelectedState] = useState('')
+    const [availableStates, setAvailableStates] = useState<Array<{name: string, code: string, cities: string[]}>>([])
+    const [availableCities, setAvailableCities] = useState<string[]>([])
 
     const handleCancelOrder = (orderId: string) => {
         setOrderToCancel(orderId)
@@ -159,6 +166,10 @@ const MyAccount = () => {
             zip: '',
             phone: ''
         })
+        setSelectedCountry('')
+        setSelectedState('')
+        setAvailableStates([])
+        setAvailableCities([])
     }
 
     const openAddForm = () => {
@@ -181,6 +192,21 @@ const MyAccount = () => {
         })
         setEditingAddress(address)
         setActiveAddress('edit')
+
+        // Set dropdown states for editing
+        setSelectedCountry(address.country)
+        setSelectedState(address.state)
+        
+        // Find and set available states for the country
+        const country = locationsData.countries.find(c => c.name === address.country)
+        if (country) {
+            setAvailableStates(country.states)
+            // Find and set available cities for the state
+            const state = country.states.find(s => s.name === address.state)
+            if (state) {
+                setAvailableCities(state.cities)
+            }
+        }
     }
 
     const closeForm = () => {
@@ -194,6 +220,64 @@ const MyAccount = () => {
         setFormData(prev => ({
             ...prev,
             [name]: value
+        }))
+    }
+
+    // Handle country selection
+    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const countryName = e.target.value
+        setSelectedCountry(countryName)
+        setSelectedState('')
+        setFormData(prev => ({
+            ...prev,
+            country: countryName,
+            state: '',
+            city: ''
+        }))
+
+        // Find and set available states for selected country
+        const country = locationsData.countries.find(c => c.name === countryName)
+        if (country) {
+            setAvailableStates(country.states)
+            setAvailableCities([])
+        } else {
+            setAvailableStates([])
+            setAvailableCities([])
+        }
+    }
+
+    // Handle state selection
+    const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const stateName = e.target.value
+        setSelectedState(stateName)
+        
+        // Find and set available cities for selected state
+        const state = availableStates.find(s => s.name === stateName)
+        if (state) {
+            setAvailableCities(state.cities)
+            // Auto-select the first city
+            const firstCity = state.cities[0]
+            setFormData(prev => ({
+                ...prev,
+                state: stateName,
+                city: firstCity
+            }))
+        } else {
+            setAvailableCities([])
+            setFormData(prev => ({
+                ...prev,
+                state: stateName,
+                city: ''
+            }))
+        }
+    }
+
+    // Handle city selection
+    const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const cityName = e.target.value
+        setFormData(prev => ({
+            ...prev,
+            city: cityName
         }))
     }
 
@@ -612,15 +696,21 @@ const MyAccount = () => {
                                             </div>
                                             <div className="country">
                                                 <label htmlFor="country" className='caption1 capitalize'>Country / Region <span className='text-red'>*</span></label>
-                                                <input 
-                                                    className="border-line mt-2 px-4 py-3 w-full rounded-lg" 
+                                                <select 
+                                                    className="border-line mt-2 px-4 py-3 w-full rounded-lg bg-white" 
                                                     id="country" 
                                                     name="country"
-                                                    type="text" 
-                                                    value={formData.country}
-                                                    onChange={handleFormChange}
+                                                    value={selectedCountry}
+                                                    onChange={handleCountryChange}
                                                     required 
-                                                />
+                                                >
+                                                    <option value="">Select Country</option>
+                                                    {locationsData.countries.map((country) => (
+                                                        <option key={country.code} value={country.name}>
+                                                            {country.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                             <div className="street sm:col-span-2">
                                                 <label htmlFor="streetAddress" className='caption1 capitalize'>Street Address <span className='text-red'>*</span></label>
@@ -636,27 +726,41 @@ const MyAccount = () => {
                                             </div>
                                             <div className="city">
                                                 <label htmlFor="city" className='caption1 capitalize'>Town / City <span className='text-red'>*</span></label>
-                                                <input 
-                                                    className="border-line mt-2 px-4 py-3 w-full rounded-lg" 
+                                                <select 
+                                                    className="border-line mt-2 px-4 py-3 w-full rounded-lg bg-white" 
                                                     id="city" 
                                                     name="city"
-                                                    type="text" 
                                                     value={formData.city}
-                                                    onChange={handleFormChange}
+                                                    onChange={handleCityChange}
                                                     required 
-                                                />
+                                                    disabled={availableCities.length === 0}
+                                                >
+                                                    <option value="">Select City</option>
+                                                    {availableCities.map((city) => (
+                                                        <option key={city} value={city}>
+                                                            {city}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                             <div className="state">
                                                 <label htmlFor="state" className='caption1 capitalize'>State <span className='text-red'>*</span></label>
-                                                <input 
-                                                    className="border-line mt-2 px-4 py-3 w-full rounded-lg" 
+                                                <select 
+                                                    className="border-line mt-2 px-4 py-3 w-full rounded-lg bg-white" 
                                                     id="state" 
                                                     name="state"
-                                                    type="text" 
-                                                    value={formData.state}
-                                                    onChange={handleFormChange}
+                                                    value={selectedState}
+                                                    onChange={handleStateChange}
                                                     required 
-                                                />
+                                                    disabled={availableStates.length === 0}
+                                                >
+                                                    <option value="">Select State</option>
+                                                    {availableStates.map((state) => (
+                                                        <option key={state.code} value={state.name}>
+                                                            {state.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                             <div className="zip">
                                                 <label htmlFor="zip" className='caption1 capitalize'>ZIP <span className='text-red'>*</span></label>

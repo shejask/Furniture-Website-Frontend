@@ -21,6 +21,7 @@ import { getShippingRates, getShippingCostForCitySync, ShippingData } from '@/fi
 import { getCouponByCode, computeCouponDiscount, CouponRecord } from '@/firebase/coupons'
 import { ref, set } from 'firebase/database'
 import { database } from '@/firebase/config'
+import locationsData from '@/components/data/locations.json'
 
 const Checkout = () => {
     const router = useRouter()
@@ -82,6 +83,11 @@ const Checkout = () => {
     const [appliedCoupon, setAppliedCoupon] = useState<CouponRecord | null>(null)
     const [discountAmount, setDiscountAmount] = useState<number>(0)
     
+    // Location dropdown states
+    const [selectedCountry, setSelectedCountry] = useState('India')
+    const [selectedState, setSelectedState] = useState('')
+    const [availableStates, setAvailableStates] = useState<Array<{name: string, code: string, cities: string[]}>>([])
+    const [availableCities, setAvailableCities] = useState<string[]>([])
     
     // Initialize shipping cost on component mount
     React.useEffect(() => {
@@ -90,6 +96,16 @@ const Checkout = () => {
             setCurrentShippingCost(0);
         }
     }, [currentShippingCost]);
+
+    // Initialize location dropdowns on component mount
+    React.useEffect(() => {
+        // Set up India as default country
+        const india = locationsData.countries.find(c => c.name === 'India')
+        if (india) {
+            setAvailableStates(india.states)
+        }
+    }, []);
+
     const [formData, setFormData] = useState({
         firstName: '',
         lastName: '',
@@ -127,6 +143,24 @@ const Checkout = () => {
             state: address.state || '',
             zip: address.zip || '',
         })
+        
+        // Set dropdown states for editing
+        setSelectedCountry(address.country || 'India')
+        setSelectedState(address.state || '')
+        
+        // Find and set available states for the country
+        const country = locationsData.countries.find(c => c.name === (address.country || 'India'))
+        if (country) {
+            setAvailableStates(country.states)
+            // Find and set available cities for the state
+            if (address.state) {
+                const state = country.states.find(s => s.name === address.state)
+                if (state) {
+                    setAvailableCities(state.cities)
+                }
+            }
+        }
+        
         console.log('Form populated with address data')
     }, [])
 
@@ -342,6 +376,76 @@ const Checkout = () => {
         // If city or state is being changed, update shipping cost
         if ((e.target.id === 'city' || e.target.id === 'state') && newFormData.city && newFormData.state) {
             const shippingCost = getShippingCostForCitySync(newFormData.city, newFormData.state, shippingData, newFormData.country);
+            setCurrentShippingCost(shippingCost);
+        }
+    }
+
+    // Handle country selection
+    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const countryName = e.target.value
+        setSelectedCountry(countryName)
+        setSelectedState('')
+        setFormData(prev => ({
+            ...prev,
+            country: countryName,
+            state: '',
+            city: ''
+        }))
+
+        // Find and set available states for selected country
+        const country = locationsData.countries.find(c => c.name === countryName)
+        if (country) {
+            setAvailableStates(country.states)
+            setAvailableCities([])
+        } else {
+            setAvailableStates([])
+            setAvailableCities([])
+        }
+    }
+
+    // Handle state selection
+    const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const stateName = e.target.value
+        setSelectedState(stateName)
+        
+        // Find and set available cities for selected state
+        const state = availableStates.find(s => s.name === stateName)
+        if (state) {
+            setAvailableCities(state.cities)
+            // Auto-select the first city
+            const firstCity = state.cities[0]
+            setFormData(prev => ({
+                ...prev,
+                state: stateName,
+                city: firstCity
+            }))
+            
+            // Update shipping cost with first city
+            if (firstCity && selectedCountry) {
+                const shippingCost = getShippingCostForCitySync(firstCity, stateName, shippingData, selectedCountry);
+                setCurrentShippingCost(shippingCost);
+            }
+        } else {
+            setAvailableCities([])
+            setFormData(prev => ({
+                ...prev,
+                state: stateName,
+                city: ''
+            }))
+        }
+    }
+
+    // Handle city selection
+    const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const cityName = e.target.value
+        setFormData(prev => ({
+            ...prev,
+            city: cityName
+        }))
+
+        // Update shipping cost when city changes
+        if (cityName && selectedState) {
+            const shippingCost = getShippingCostForCitySync(cityName, selectedState, shippingData, selectedCountry);
             setCurrentShippingCost(shippingCost);
         }
     }
@@ -899,35 +1003,60 @@ const Checkout = () => {
                                                     />
                                                 </div>
                                                 <div className="">
+                                                    <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+                                                        Country *
+                                                    </label>
+                                                    <select 
+                                                        className="border-line px-4 py-3 w-full rounded-lg bg-white" 
+                                                        id="country" 
+                                                        name="country"
+                                                        value={selectedCountry}
+                                                        onChange={handleCountryChange}
+                                                        required 
+                                                    >
+                                                        <option value="India">India</option>
+                                                    </select>
+                                                </div>
+                                                <div className="">
                                                     <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
                                                         City *
                                                     </label>
-                                                    <input 
-                                                        className="border-line px-4 py-3 w-full rounded-lg" 
+                                                    <select 
+                                                        className="border-line px-4 py-3 w-full rounded-lg bg-white" 
                                                         id="city" 
-                                                        type="text" 
-                                                        placeholder="Enter your city" 
+                                                        name="city"
                                                         value={formData.city}
-                                                        onChange={handleInputChange}
+                                                        onChange={handleCityChange}
                                                         required 
-                                                    />
+                                                        disabled={availableCities.length === 0}
+                                                    >
+                                                        <option value="">Select City</option>
+                                                        {availableCities.map((city) => (
+                                                            <option key={city} value={city}>
+                                                                {city}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div className="select-block">
                                                     <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
                                                         State *
                                                     </label>
                                                     <select 
-                                                        className="border border-line px-4 py-3 w-full rounded-lg" 
+                                                        className="border border-line px-4 py-3 w-full rounded-lg bg-white" 
                                                         id="state" 
                                                         name="state" 
-                                                        value={formData.state}
-                                                        onChange={handleInputChange}
+                                                        value={selectedState}
+                                                        onChange={handleStateChange}
                                                         required
+                                                        disabled={availableStates.length === 0}
                                                     >
-                                                        <option value="" disabled>Choose State</option>
-                                                        <option value="Kerala">Kerala</option>
-                                                        <option value="Tamil Nadu">Tamil Nadu</option>
-                                                        <option value="Karnataka">Karnataka</option>
+                                                        <option value="">Select State</option>
+                                                        {availableStates.map((state) => (
+                                                            <option key={state.code} value={state.name}>
+                                                                {state.name}
+                                                            </option>
+                                                        ))}
                                                     </select>
                                                     <Icon.CaretDown className='arrow-down' />
                                                 </div>

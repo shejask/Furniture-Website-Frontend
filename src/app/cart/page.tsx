@@ -111,7 +111,7 @@ const Cart = () => {
             router.push('/login');
             return;
         }
-        router.push(`/checkout?discount=${discountCart}`)
+        router.push('/checkout')
     }
 
     return (
@@ -210,19 +210,7 @@ const Cart = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="input-block discount-code w-full sm:mt-7 mt-5">
-                                <div className='w-full flex gap-2'>
-                                    <input value={couponCode} onChange={(e)=>setCouponCode(e.target.value)} type="text" placeholder='Enter coupon code' className='flex-1 h-12 bg-surface pl-4 pr-4 rounded-lg border border-line' />
-                                    <button type='button' onClick={handleApplyCoupon} className='button-main h-12 px-5 rounded-lg flex items-center justify-center bg-green text-black'>Apply</button>
-                                </div>
-                                {couponError && <div className='caption1 text-red mt-2'>{couponError}</div>}
-                                {appliedCoupon && !couponError && (
-                                    <div className='caption1 text-green font-medium mt-2 flex items-center gap-3 bg-green/10 p-2 rounded-lg'>
-                                        <span>✅ Coupon <strong>{appliedCoupon.code}</strong> applied. You save ₹{discountCart}.00</span>
-                                        <button type='button' onClick={handleClearCoupon} className='underline text-red hover:text-red-700'>Remove</button>
-                                    </div>
-                                )}
-                            </div>
+                            {/* Coupon section hidden */}
                             {/* Predefined vouchers removed; using Firebase coupons via code input */}
                         </div>
                         <div className="xl:w-1/3 xl:pl-12 w-full">
@@ -232,14 +220,11 @@ const Cart = () => {
                                     <div className="text-title">Subtotal</div>
                                     <div className="text-title">₹<span className="total-product">{totalCart}</span><span>.00</span></div>
                                 </div>
-                                <div className="discount-block py-5 flex justify-between border-b border-line">
-                                    <div className="text-title">Discounts</div>
-                                    <div className="text-title"> <span>-₹</span><span className="discount">{discountCart}</span><span>.00</span></div>
-                                </div>
+                                {/* Discount row hidden */}
                                 <div className="total-cart-block pt-4 pb-4 flex justify-between">
                                     <div className="heading5">Total</div>
                                     <div className="heading5">₹
-                                        <span className="total-cart heading5">{totalCart - discountCart}</span>
+                                        <span className="total-cart heading5">{totalCart}</span>
                                         <span className='heading5'>.00</span></div>
                                 </div>
                                 <div className="block-button flex flex-col items-center gap-y-4 mt-5">
