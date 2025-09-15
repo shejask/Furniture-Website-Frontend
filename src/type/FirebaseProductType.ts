@@ -50,6 +50,7 @@ export interface FirebaseProductType {
     randomRelatedProduct?: boolean;
     wholesalePriceType?: string;
     taxId?: string; // Tax identification number
+    rating?: number; // Product rating (1-5 stars)
 }
 
 // Helper function to convert Firebase product to UI product type
