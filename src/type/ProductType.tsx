@@ -22,6 +22,7 @@ export interface ProductType {
     new: boolean,
     sale: boolean,
     rate: number,
+    rating?: number,
     price: number,
     salePrice?: number,
     originPrice: number,
@@ -61,7 +62,8 @@ export interface ProductType {
     onSale?: boolean,
     newArrivals?: boolean,
     trending?: boolean,
-    status?: string // Add status field for filtering
+    status?: string, // Add status field for filtering
+    taxId?: string // Add taxId field for tax information
 }
 
 export interface ReviewType {

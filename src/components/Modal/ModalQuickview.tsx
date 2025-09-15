@@ -169,59 +169,80 @@ const ModalQuickview = () => {
                                             -{percentSale}%
                                         </div>
                                     )}
-                                    <div className='desc text-secondary mt-3'>{selectedProduct?.description}</div>
                                 </div>
+                                {selectedProduct?.rating && (
+                                    <div className="flex items-center mt-3">
+                                        <div className="flex items-center">
+                                            {[...Array(5)].map((_, i) => (
+                                                <span
+                                                    key={i}
+                                                    className={`text-sm ${i < selectedProduct.rating! ? 'text-yellow-400' : 'text-gray-300'}`}
+                                                >
+                                                    ★
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <span className="caption1 text-secondary ml-2">
+                                            ({selectedProduct.rating}/5)
+                                        </span>
+                                    </div>
+                                )}
+                                <div className='desc text-secondary mt-3'>{selectedProduct?.description}</div>
                                 <div className="list-action mt-6">
-                                    <div className="choose-color">
-                                        <div className="text-title">Colors: <span className='text-title color'>{activeColor}</span></div>
-                                        <div className="list-color flex items-center gap-2 flex-wrap mt-3">
-                                            {selectedProduct?.variation.map((item, index) => (
-                                                <div
-                                                    className={`color-item w-12 h-12 rounded-xl duration-300 relative ${activeColor === item.color ? 'active' : ''}`}
-                                                    key={index}
-                                                    datatype={item.image}
-                                                    onClick={() => {
-                                                        handleActiveColor(item.color)
-                                                    }}
-                                                >
-                                                    <Image
-                                                        src={item.colorImage}
-                                                        width={100}
-                                                        height={100}
-                                                        alt='color'
-                                                        className='rounded-xl'
-                                                    />
-                                                    <div className="tag-action bg-black text-white caption2 capitalize px-1.5 py-0.5 rounded-sm">
-                                                        {item.color}
+                                    {selectedProduct?.variation && selectedProduct.variation.length > 0 && (
+                                        <div className="choose-color">
+                                            <div className="text-title">Colors: <span className='text-title color'>{activeColor}</span></div>
+                                            <div className="list-color flex items-center gap-2 flex-wrap mt-3">
+                                                {selectedProduct?.variation.map((item, index) => (
+                                                    <div
+                                                        className={`color-item w-12 h-12 rounded-xl duration-300 relative ${activeColor === item.color ? 'active' : ''}`}
+                                                        key={index}
+                                                        datatype={item.image}
+                                                        onClick={() => {
+                                                            handleActiveColor(item.color)
+                                                        }}
+                                                    >
+                                                        <Image
+                                                            src={item.colorImage}
+                                                            width={100}
+                                                            height={100}
+                                                            alt='color'
+                                                            className='rounded-xl'
+                                                        />
+                                                        <div className="tag-action bg-black text-white caption2 capitalize px-1.5 py-0.5 rounded-sm">
+                                                            {item.color}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="choose-size mt-5">
-                                        <div className="heading flex items-center justify-between">
-                                            <div className="text-title">Size: <span className='text-title size'>{activeSize}</span></div>
-                                            <div
-                                                className="caption1 size-guide text-red underline cursor-pointer"
-                                                onClick={handleOpenSizeGuide}
-                                            >
-                                                Size Guide
+                                                ))}
                                             </div>
-                                            <ModalSizeguide data={selectedProduct} isOpen={openSizeGuide} onClose={handleCloseSizeGuide} />
                                         </div>
-                                        <div className="list-size flex items-center gap-2 flex-wrap mt-3">
-                                            {selectedProduct?.sizes.map((item, index) => (
+                                    )}
+                                    {selectedProduct?.sizes && selectedProduct.sizes.length > 0 && (
+                                        <div className="choose-size mt-5">
+                                            <div className="heading flex items-center justify-between">
+                                                <div className="text-title">Size: <span className='text-title size'>{activeSize}</span></div>
                                                 <div
-                                                    className={`size-item ${item === 'freesize' ? 'px-3 py-2' : 'w-12 h-12'} flex items-center justify-center text-button rounded-full bg-white border border-line ${activeSize === item ? 'active' : ''}`}
-                                                    key={index}
-                                                    onClick={() => handleActiveSize(item)}
+                                                    className="caption1 size-guide text-red underline cursor-pointer"
+                                                    onClick={handleOpenSizeGuide}
                                                 >
-                                                    {item}
+                                                    Size Guide
                                                 </div>
-                                            ))}
+                                                <ModalSizeguide data={selectedProduct} isOpen={openSizeGuide} onClose={handleCloseSizeGuide} />
+                                            </div>
+                                            <div className="list-size flex items-center gap-2 flex-wrap mt-3">
+                                                {selectedProduct?.sizes.map((item, index) => (
+                                                    <div
+                                                        className={`size-item ${item === 'freesize' ? 'px-3 py-2' : 'w-12 h-12'} flex items-center justify-center text-button rounded-full bg-white border border-line ${activeSize === item ? 'active' : ''}`}
+                                                        key={index}
+                                                        onClick={() => handleActiveSize(item)}
+                                                    >
+                                                        {item}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="text-title mt-5">Quantity:</div>
+                                    )}
+                                    <div className={`text-title ${(selectedProduct?.variation && selectedProduct.variation.length > 0) || (selectedProduct?.sizes && selectedProduct.sizes.length > 0) ? 'mt-5' : 'mt-6'}`}>Quantity:</div>
                                     <div className="choose-quantity flex items-center max-xl:flex-wrap lg:justify-between gap-5 mt-3">
                                         <div className="quantity-block md:p-3 max-md:py-1.5 max-md:px-3 flex items-center justify-between rounded-lg border border-line sm:w-[180px] w-[120px] flex-shrink-0">
                                             <Icon.Minus

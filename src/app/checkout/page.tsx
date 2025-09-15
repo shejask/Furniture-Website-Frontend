@@ -19,7 +19,8 @@ import { Address, getUserAddresses } from '@/firebase/addresses'
 import { saveOrder, Order, OrderItem, OrderAddress } from '@/firebase/orders'
 import { getShippingRates, getShippingCostForCitySync, ShippingData } from '@/firebase/shipping'
 import { getCouponByCode, computeCouponDiscount, CouponRecord } from '@/firebase/coupons'
-import { ref, set } from 'firebase/database'
+import { getTaxById, TaxType } from '@/firebase/taxes'
+import { ref, set, get } from 'firebase/database'
 import { database } from '@/firebase/config'
 import { locationsData } from '@/components/data/locations'
 
@@ -33,39 +34,19 @@ const Checkout = () => {
     const { cartState, clearCart } = useCart();
     
     // Filter cart items for Buy Now mode - show only the most recently added item
-    const displayCartItems = buyNow === 'true' && cartState.cartArray.length > 0 
-        ? [cartState.cartArray[cartState.cartArray.length - 1]] // Show only the last added item
-        : cartState.cartArray; // Show all items in normal mode
+    const displayCartItems = React.useMemo(() => {
+        return buyNow === 'true' && cartState.cartArray.length > 0 
+            ? [cartState.cartArray[cartState.cartArray.length - 1]] // Show only the last added item
+            : cartState.cartArray; // Show all items in normal mode
+    }, [buyNow, cartState.cartArray]);
     const { initiatePayment, isLoading, error } = useRazorpay();
     const [user, userLoading, authError] = useAuthState(auth);
     const { addresses, loading: addressLoading, addAddress, editAddress, makeDefault, getDefaultAddress, refreshAddresses, removeAddress } = useAddresses();
     
-    // Debug logging
-    React.useEffect(() => {
-        console.log('Debug - User loading:', userLoading);
-        console.log('Debug - User:', user?.email);
-        console.log('Debug - Addresses changed:', addresses.length, addresses);
-        console.log('Debug - Address loading:', addressLoading);
-        console.log('Debug - Discount:', discount);
-        console.log('Debug - Shipping:', ship);
-    }, [userLoading, user, addresses, addressLoading, discount, ship]);
 
     // Test Firebase connection on component mount
     React.useEffect(() => {
-        const testFirebaseConnection = async () => {
-            try {
-                console.log('Testing Firebase connection...');
-                const testRef = ref(database, 'test/connection');
-                await set(testRef, { timestamp: new Date().toISOString() });
-                console.log('Firebase connection test successful');
-            } catch (error) {
-                console.error('Firebase connection test failed:', error);
-            }
-        };
-        
-        if (user) {
-            testFirebaseConnection();
-        }
+        // Initialize user-dependent logic here
     }, [user]);
 
     
@@ -82,6 +63,9 @@ const Checkout = () => {
     const [couponError, setCouponError] = useState<string>('')
     const [appliedCoupon, setAppliedCoupon] = useState<CouponRecord | null>(null)
     const [discountAmount, setDiscountAmount] = useState<number>(0)
+    const [isPaymentProcessing, setIsPaymentProcessing] = useState<boolean>(false)
+    const [taxDataCache, setTaxDataCache] = useState<{[taxId: string]: TaxType}>({})
+    const [taxLoadingCache, setTaxLoadingCache] = useState<{[taxId: string]: boolean}>({})
     
     // Location dropdown states
     const [selectedCountry, setSelectedCountry] = useState('India')
@@ -92,16 +76,12 @@ const Checkout = () => {
     // Initialize shipping cost on component mount
     React.useEffect(() => {
         if (currentShippingCost === null || currentShippingCost === undefined) {
-            console.log('Initializing shipping cost to 0');
             setCurrentShippingCost(0);
         }
     }, [currentShippingCost]);
 
     // Initialize location dropdowns on component mount
     React.useEffect(() => {
-        console.log('Debug - locationsData:', locationsData)
-        console.log('Debug - locationsData type:', typeof locationsData)
-        console.log('Debug - countries:', locationsData?.countries)
         
         // Hardcode states for testing
         const hardcodedStates = [
@@ -119,16 +99,73 @@ const Checkout = () => {
         
         setSelectedCountry('India')
         setAvailableStates(hardcodedStates)
-        console.log('Debug - Hardcoded states set:', hardcodedStates)
         
         // Also try the original method
         if (locationsData && locationsData.countries) {
             const india = locationsData.countries.find(c => c.name === 'India')
             if (india) {
-                console.log('Debug - Original method also working:', india.states)
+                // Original method also working
             }
         }
     }, []);
+
+    // Function to fetch tax data for a product
+    const fetchTaxData = React.useCallback(async (taxId: string) => {
+        if (!taxId || taxDataCache[taxId] || taxLoadingCache[taxId]) {
+            return; // Already cached or loading
+        }
+
+        try {
+            setTaxLoadingCache(prev => ({ ...prev, [taxId]: true }));
+            
+            const taxData = await getTaxById(taxId);
+            
+            if (taxData) {
+                setTaxDataCache(prev => ({ ...prev, [taxId]: taxData }));
+            }
+        } catch (error) {
+            // Error fetching tax data
+        } finally {
+            setTaxLoadingCache(prev => ({ ...prev, [taxId]: false }));
+        }
+    }, [taxDataCache, taxLoadingCache]);
+
+    // Function to fetch product data and update cart items with taxId
+    const updateCartItemsWithTaxId = React.useCallback(async () => {
+        for (const cartItem of displayCartItems) {
+            if (!(cartItem as any).taxId) {
+                try {
+                    // Fetch the product data from Firebase to get the taxId
+                    const productRef = ref(database, `/products/${cartItem.id}`);
+                    const snapshot = await get(productRef);
+                    
+                    if (snapshot.exists()) {
+                        const productData = snapshot.val();
+                        
+                        if (productData.taxId) {
+                            // Update the cart item with taxId
+                            (cartItem as any).taxId = productData.taxId;
+                            
+                            // Fetch tax data
+                            fetchTaxData(productData.taxId);
+                        }
+                        
+                        // Update rating if available, otherwise use default
+                        (cartItem as any).rating = productData.rating || 4;
+                    }
+                } catch (error) {
+                    // Error fetching product data
+                }
+            } else {
+                fetchTaxData((cartItem as any).taxId);
+            }
+        }
+    }, [displayCartItems, fetchTaxData]);
+
+    // Fetch tax data for all products in cart
+    React.useEffect(() => {
+        updateCartItemsWithTaxId();
+    }, [displayCartItems, updateCartItemsWithTaxId]);
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -147,16 +184,15 @@ const Checkout = () => {
         setTimeout(() => setMessage(null), 5000) // Auto-hide after 5 seconds
     }
 
+
     // Update email when user changes
     React.useEffect(() => {
         if (user?.email) {
             // Email is handled separately, not in formData
-            console.log('User email:', user.email)
         }
     }, [user?.email])
 
     const populateFormWithAddress = React.useCallback((address: Address) => {
-        console.log('Populating form with address:', address)
         setFormData({
             firstName: address.firstName || '',
             lastName: address.lastName || '',
@@ -185,7 +221,6 @@ const Checkout = () => {
             }
         }
         
-        console.log('Form populated with address data')
     }, [])
 
     // Set default address when addresses load (only if not showing form)
@@ -211,7 +246,6 @@ const Checkout = () => {
     }
 
     const handleNewAddress = () => {
-        console.log('Creating new address - clearing all data')
         setSelectedAddress(null)
         setFormData({
             firstName: '',
@@ -224,7 +258,6 @@ const Checkout = () => {
             zip: '',
         })
         setShowAddressForm(true)
-        console.log('Form cleared, showing new address form')
     }
 
     const handleEditAddress = (address: Address) => {
@@ -304,8 +337,7 @@ const Checkout = () => {
                 }
             }
         } catch (error) {
-            console.error('Error saving/updating address:', error)
-            console.error('Error details:', error)
+            // Error saving/updating address
             showMessage('error', `Failed to save/update address. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
     }
@@ -314,25 +346,24 @@ const Checkout = () => {
     React.useEffect(() => {
         const loadShippingData = async () => {
             try {
-                console.log('Loading shipping data...');
                 const data = await getShippingRates();
-                console.log('Shipping data loaded successfully:', data);
                 setShippingData(data);
                 
                 // If we have shipping data and a selected address, calculate shipping
                 if (Object.keys(data).length > 0 && selectedAddress) {
-                    console.log('Recalculating shipping for selected address after data load');
                     const shippingCost = getShippingCostForCitySync(selectedAddress.city, selectedAddress.state, data, selectedAddress.country);
                     setCurrentShippingCost(shippingCost);
                 }
             } catch (error) {
-                console.error('Error loading shipping data:', error);
+                // Error loading shipping data
                 setCurrentShippingCost(50); // Set default if loading fails
             }
         };
         
         loadShippingData();
     }, [selectedAddress]);
+
+
 
     // Calculate total cart amount properly
     const calculatedTotalCart = displayCartItems.reduce((total, item) => {
@@ -451,7 +482,6 @@ const Checkout = () => {
                     const shippingCost = getShippingCostForCitySync(firstCity, stateName, shippingData, selectedCountry);
                     setCurrentShippingCost(shippingCost);
                 }
-                console.log('Debug - Cities loaded for', stateName, ':', state.cities)
             } else {
                 setAvailableCities([])
                 setFormData(prev => ({
@@ -597,7 +627,6 @@ const Checkout = () => {
         }
 
         // Validate that all required fields are present and not undefined
-        console.log('Validating order data before save:', orderData);
         
         // Check for any undefined values
         const undefinedKeys = Object.keys(orderData).filter(key => orderData[key] === undefined);
@@ -624,33 +653,33 @@ const Checkout = () => {
             finalAmount,
             userDetails,
             async (response) => {
-                console.log('Payment successful:', response)
+                
+                // Show loading overlay immediately after payment success
+                setIsPaymentProcessing(true)
                 
                 let orderData: any = null;
                 try {
                     // Create and save order
-                    console.log('Creating order data...');
                     orderData = createOrderData('razorpay', response.razorpay_payment_id, response.razorpay_order_id);
-                    console.log('Order data created:', orderData);
-                    
-                    console.log('Saving order to Firebase...');
                     const savedOrderId = await saveOrder(orderData);
-                    console.log('Order saved successfully with ID:', savedOrderId);
                     
                     // Clear cart and redirect
                     clearCart()
                     router.push(`/payment/success?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&amount=${finalAmount}`)
                 } catch (error) {
-                    console.error('Error saving order:', error);
-                    console.error('Error details:', error);
-                    console.error('Order data that failed:', orderData);
+                    // Error saving order
                     showMessage('error', `Payment successful but failed to save order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please contact support with order ID: ${response.razorpay_order_id}`);
                     clearCart()
                     router.push(`/payment/success?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&amount=${finalAmount}`)
+                } finally {
+                    // Hide loading overlay after navigation
+                    setTimeout(() => {
+                        setIsPaymentProcessing(false)
+                    }, 1000)
                 }
             },
             (error) => {
-                console.error('Payment failed:', error)
+                // Payment failed
                 router.push(`/payment/failure?error=${encodeURIComponent(error.error || 'Payment failed')}`)
             }
         )
@@ -727,8 +756,7 @@ const Checkout = () => {
                 await refreshAddresses()
                 setShowAddressForm(false)
             } catch (error) {
-                console.error('Error saving/updating address:', error)
-                console.error('Error details:', error)
+                // Error saving/updating address
                 showMessage('error', `Failed to save/update address. Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
                 return
             }
@@ -738,24 +766,23 @@ const Checkout = () => {
             await handleRazorpayPayment()
         } else if (activePayment === 'cash-delivery') {
             // Handle COD
+            setIsPaymentProcessing(true)
             let orderData: any = null;
             try {
-                console.log('Creating COD order data...');
                 orderData = createOrderData('cash-delivery');
-                console.log('COD order data created:', orderData);
-                
-                console.log('Saving COD order to Firebase...');
                 const savedOrderId = await saveOrder(orderData);
-                console.log('COD order saved successfully with ID:', savedOrderId);
                 
                 showMessage('success', 'COD order placed successfully!')
                 clearCart()
                 router.push(`/order-tracking?order_id=${orderData.orderId}`)
             } catch (error) {
-                console.error('Error saving COD order:', error);
-                console.error('Error details:', error);
-                console.error('Order data that failed:', orderData);
+                // Error saving COD order
                 showMessage('error', `Failed to save COD order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+            } finally {
+                // Hide loading overlay after navigation
+                setTimeout(() => {
+                    setIsPaymentProcessing(false)
+                }, 1000)
             }
         } else {
             showMessage('info', 'This payment method is not yet implemented')
@@ -935,7 +962,7 @@ const Checkout = () => {
                                                                                     showMessage('error', 'Failed to set as default. Please try again.');
                                                                                 }
                                                                             } catch (error) {
-                                                                                console.error('Error setting default address:', error);
+                                                                                // Error setting default address
                                                                                 showMessage('error', 'Failed to set as default. Please try again.');
                                                                             }
                                                                         }}
@@ -1283,11 +1310,39 @@ const Checkout = () => {
                                                     <div className="flex items-center justify-between w-full">
                                                         <div>
                                                             <div className="name text-title">{product.name}</div>
+                                                            {(product as any).rating && (
+                                                                <div className="flex items-center mt-1">
+                                                                    <div className="flex items-center">
+                                                                        {[...Array(5)].map((_, i) => (
+                                                                            <span
+                                                                                key={i}
+                                                                                className={`text-sm ${i < (product as any).rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                                                                            >
+                                                                                ★
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                    <span className="caption1 text-secondary ml-2">
+                                                                        ({(product as any).rating}/5)
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                             {(product.selectedSize || (product.sizes && product.sizes[0]) || product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)) && (
                                                                 <div className="caption1 text-secondary mt-2">
                                                                     {(product.selectedSize || (product.sizes && product.sizes[0])) && <span className='size capitalize'>{product.selectedSize || (product.sizes && product.sizes[0])}</span>}
                                                                     {(product.selectedSize || (product.sizes && product.sizes[0])) && (product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)) && <span>/</span>}
                                                                     {(product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)) && <span className='color capitalize'>{product.selectedColor || (product.variation && product.variation[0] && product.variation[0].color)}</span>}
+                                                                </div>
+                                                            )}
+                                                            {(product as any).taxId && (
+                                                                <div className="mt-1">
+                                                                    {taxLoadingCache[(product as any).taxId] ? (
+                                                                        <span className='caption1 text-secondary'>Loading GST...</span>
+                                                                    ) : taxDataCache[(product as any).taxId] ? (
+                                                                        <span className='caption1 text-secondary'>
+                                                                            Price includes {taxDataCache[(product as any).taxId].rate}% GST
+                                                                        </span>
+                                                                    ) : null}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1346,6 +1401,17 @@ const Checkout = () => {
                 </div>
             </div>
             <Footer />
+            
+            {/* Payment Processing Overlay */}
+            {isPaymentProcessing && (
+                <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+                    <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center shadow-2xl">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green mx-auto mb-4"></div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Please wait...</h3>
+                        <p className="text-gray-600 text-sm">Processing your order and redirecting you to the success page</p>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

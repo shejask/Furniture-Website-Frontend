@@ -82,7 +82,23 @@ const Register = () => {
             // Redirect to home page after successful registration
             router.push('/');
         } catch (err: any) {
-            setError(err.message || 'An error occurred during registration');
+            let errorMessage = 'Unable to create your account. Please try again.';
+            
+            if (err.message.includes('email-already-in-use')) {
+                errorMessage = 'An account with this email address already exists. Please try logging in instead.';
+            } else if (err.message.includes('weak-password')) {
+                errorMessage = 'Password is too weak. Please choose a stronger password with at least 6 characters.';
+            } else if (err.message.includes('invalid-email')) {
+                errorMessage = 'Please enter a valid email address.';
+            } else if (err.message.includes('operation-not-allowed')) {
+                errorMessage = 'Account creation is temporarily disabled. Please try again later.';
+            } else if (err.message.includes('network-request-failed')) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
+            } else if (err.message.includes('too-many-requests')) {
+                errorMessage = 'Too many attempts. Please wait a few minutes before trying again.';
+            }
+            
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -190,8 +206,11 @@ const Register = () => {
                                     </label>
                                 </div>
                                 {error && (
-                                    <div className="error-message mt-4 text-red-500">
-                                        {error}
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                                        <div className="flex items-center">
+                                            <Icon.WarningCircle size={20} className="text-red-500 mr-2" />
+                                            <span className="text-red-800 font-medium">{error}</span>
+                                        </div>
                                     </div>
                                 )}
                                 <div className="block-button md:mt-7 mt-4">

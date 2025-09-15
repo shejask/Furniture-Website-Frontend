@@ -70,7 +70,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
                     ...action.payload, 
                     quantity: 1, 
                     selectedSize: action.payload.selectedSize || '', 
-                    selectedColor: action.payload.selectedColor || '' 
+                    selectedColor: action.payload.selectedColor || ''
                 };
                 return {
                     ...state,

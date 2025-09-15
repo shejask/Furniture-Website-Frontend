@@ -458,6 +458,23 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                                 <div className="product-price text-title">₹{displayPrice}.00</div>
 
                             </div>
+                            {data.rating && (
+                                <div className="flex items-center mt-2">
+                                    <div className="flex items-center">
+                                        {[...Array(5)].map((_, i) => (
+                                            <span
+                                                key={i}
+                                                className={`text-sm ${i < data.rating! ? 'text-yellow-400' : 'text-gray-300'}`}
+                                            >
+                                                ★
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <span className="caption1 text-secondary ml-2">
+                                        ({data.rating}/5)
+                                    </span>
+                                </div>
+                            )}
 
                             {style === 'style-5' &&
                                 <>
@@ -558,6 +575,23 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                                                     </div>
                                                 )}
                                             </div>
+                                            {data.rating && (
+                                                <div className="flex items-center mt-2">
+                                                    <div className="flex items-center">
+                                                        {[...Array(5)].map((_, i) => (
+                                                            <span
+                                                                key={i}
+                                                                className={`text-sm ${i < data.rating! ? 'text-yellow-400' : 'text-gray-300'}`}
+                                                            >
+                                                                ★
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <span className="caption1 text-secondary ml-2">
+                                                        ({data.rating}/5)
+                                                    </span>
+                                                </div>
+                                            )}
                                             {data.variation.length > 0 && data.action === 'add to cart' ? (
                                                 <div className="list-color max-md:hidden py-2 mt-5 mb-1 flex items-center gap-3 flex-wrap duration-300">
                                                     {data.variation.map((item, index) => (
@@ -697,6 +731,23 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                             <Rate currentRate={data.rate} size={16} />
                         </div>
                         <span className="text-title inline-block mt-1">₹{displayPrice}.00</span>
+                        {data.rating && (
+                            <div className="flex items-center mt-2">
+                                <div className="flex items-center">
+                                    {[...Array(5)].map((_, i) => (
+                                        <span
+                                            key={i}
+                                            className={`text-sm ${i < data.rating! ? 'text-yellow-400' : 'text-gray-300'}`}
+                                        >
+                                            ★
+                                        </span>
+                                    ))}
+                                </div>
+                                <span className="caption1 text-secondary ml-2">
+                                    ({data.rating}/5)
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : (

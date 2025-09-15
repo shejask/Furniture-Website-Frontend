@@ -49,6 +49,7 @@ export interface FirebaseProductType {
     sizeChart?: string;
     randomRelatedProduct?: boolean;
     wholesalePriceType?: string;
+    taxId?: string; // Tax identification number
 }
 
 // Helper function to convert Firebase product to UI product type
@@ -131,6 +132,8 @@ export const convertFirebaseToUIProduct = (product: FirebaseProductType) => {
         warrantyTime: product.warrantyTime,
         bestSeller: product.bestSeller || false,
         onSale: product.onSale || false,
-        newArrivals: product.newArrivals || false
+        newArrivals: product.newArrivals || false,
+        taxId: product.taxId,
+        rating: product.rating || 4 // Default rating if not provided
     }
 }

@@ -59,6 +59,8 @@ interface FirebaseProductType {
     onSale?: boolean;
     newArrivals?: boolean;
     featured?: boolean;
+    taxId?: string;
+    rating?: number;
 }
 
 const ProductClient = ({ productId }: { productId: string | null }) => {
@@ -159,7 +161,9 @@ const ProductClient = ({ productId }: { productId: string | null }) => {
             onSale: product.onSale,
             newArrivals: product.newArrivals,
             trending: product.trending,
-            featured: product.featured
+            featured: product.featured,
+            taxId: product.taxId,
+            rating: product.rating || 4 // Default rating if not provided
         };
 
     return (

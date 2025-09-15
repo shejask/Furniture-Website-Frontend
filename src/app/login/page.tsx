@@ -61,7 +61,25 @@ const Login = () => {
             // Redirect to home page
             router.push('/');
         } catch (err: any) {
-            setError(err.message || 'An error occurred during login');
+            let errorMessage = 'Unable to sign in. Please try again.';
+            
+            if (err.message.includes('user-not-found')) {
+                errorMessage = 'No account found with this email address. Please check your email or create a new account.';
+            } else if (err.message.includes('wrong-password')) {
+                errorMessage = 'Incorrect password. Please try again or reset your password.';
+            } else if (err.message.includes('invalid-email')) {
+                errorMessage = 'Please enter a valid email address.';
+            } else if (err.message.includes('user-disabled')) {
+                errorMessage = 'This account has been disabled. Please contact support.';
+            } else if (err.message.includes('too-many-requests')) {
+                errorMessage = 'Too many failed attempts. Please wait a few minutes before trying again.';
+            } else if (err.message.includes('network-request-failed')) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
+            } else if (err.message.includes('invalid-credential')) {
+                errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+            }
+            
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -120,11 +138,14 @@ const Login = () => {
                                         </div>
                                         <label htmlFor='remember' className="pl-2 cursor-pointer">Remember me</label>
                                     </div>
-                                    <Link href={'/forgot-password'} className='font-semibold hover:underline'>Forgot Your Password?</Link>
+                                    <Link href={'/forgot-password'} className='font-semibold text-blue-600 hover:text-blue-800 hover:underline'>Forgot Your Password?</Link>
                                 </div>
                                 {error && (
-                                    <div className="error-message mt-4 text-red-500">
-                                        {error}
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+                                        <div className="flex items-center">
+                                            <Icon.WarningCircle size={20} className="text-red-500 mr-2" />
+                                            <span className="text-red-800 font-medium">{error}</span>
+                                        </div>
                                     </div>
                                 )}
                                 <div className="block-button md:mt-7 mt-4">

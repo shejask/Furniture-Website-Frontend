@@ -5,6 +5,7 @@ import { ref, get, set, remove, child } from 'firebase/database'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { database, storage } from '@/firebase/config'
 import { fetchVendors, Vendor } from '@/firebase/vendors'
+import { getTaxById, TaxType } from '@/firebase/taxes'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -85,6 +86,8 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     const [reviewSuccessMessage, setReviewSuccessMessage] = useState<string | null>(null);
     const [reviewErrorMessage, setReviewErrorMessage] = useState<string | null>(null);
     const [showAllReviews, setShowAllReviews] = useState<boolean>(false);
+    const [taxData, setTaxData] = useState<TaxType | null>(null);
+    const [taxLoading, setTaxLoading] = useState<boolean>(false);
 
     const fetchCategoryData = useCallback(async (categoryId: string, retryCount = 0) => {
         try {
@@ -218,6 +221,29 @@ const Default: React.FC<Props> = ({ data, productId }) => {
         }
     }, []);
 
+    const fetchTaxData = useCallback(async (taxId: string) => {
+        try {
+            console.log('🔍 Fetching tax data for ID:', taxId);
+            setTaxLoading(true);
+            
+            const taxData = await getTaxById(taxId);
+            
+            if (taxData) {
+                console.log('✅ Tax data received:', taxData);
+                console.log('✅ Tax rate:', taxData.rate);
+                console.log('✅ Tax name:', taxData.name);
+                setTaxData(taxData);
+            } else {
+                console.log('❌ Tax not found');
+                setTaxData(null);
+            }
+        } catch (error) {
+            console.error('Error fetching tax data:', error);
+            setTaxData(null);
+        } finally {
+            setTaxLoading(false);
+        }
+    }, []);
 
     const fetchReviewsData = useCallback(async (productId: string, retryCount = 0) => {
         try {
@@ -524,7 +550,15 @@ const Default: React.FC<Props> = ({ data, productId }) => {
             fetchAttributesData(productMain.id);
             fetchReviewsData(productMain.id);
         }
-    }, [productMain, fetchAttributesData, fetchBrandData, fetchCategoryData, fetchReviewsData, fetchVendorData]);
+
+        // Fetch tax data
+        if (productMain?.taxId) {
+            console.log('✅ Found taxId, fetching tax:', productMain.taxId);
+            fetchTaxData(productMain.taxId);
+        } else {
+            console.log('❌ No taxId found in productMain');
+        }
+    }, [productMain, fetchAttributesData, fetchBrandData, fetchCategoryData, fetchReviewsData, fetchVendorData, fetchTaxData]);
 
     const handleActiveColor = (item: string) => {
         setActiveColor(item)
@@ -756,6 +790,19 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                         </div>
                                     )}
                                 </div>
+                                {productMain.taxId && (
+                                    <div className="mt-2">
+                                        {taxLoading ? (
+                                            <span className='caption1 text-secondary'>Loading GST info...</span>
+                                        ) : taxData ? (
+                                            <span className='caption1 text-secondary'>
+                                                Price includes {taxData.rate}% GST
+                                            </span>
+                                        ) : (
+                                            <span className='caption1 text-secondary'>GST information unavailable</span>
+                                        )}
+                                    </div>
+                                )}
                                     <div className='desc text-secondary mt-3'>{productMain.shortDescription || productMain.description}</div>
                             </div>
                             <div className="list-action mt-6">

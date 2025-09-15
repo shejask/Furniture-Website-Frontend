@@ -11,6 +11,7 @@ import MenuCategory from '@/components/Furniture/MenuCategory'
 import BannerTop from '@/components/Home3/BannerTop'
 import { useAuthState } from 'react-firebase-hooks/auth'
 import { auth } from '@/firebase/config'
+import { changePassword, resetPassword } from '@/firebase/auth'
 import { getCustomerOrders, Order, updateOrderStatus } from '@/firebase/orders'
 import { locationsData } from '@/components/data/locations'
 
@@ -48,6 +49,12 @@ const MyAccount = () => {
     const [userData, setUserData] = useState<UserData | null>(null)
     const [addresses, setAddresses] = useState<Address[]>([])
     const [editingAddress, setEditingAddress] = useState<Address | null>(null)
+    const [showPasswordForm, setShowPasswordForm] = useState<boolean>(false)
+    const [passwordMessage, setPasswordMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
+    const [passwordLoading, setPasswordLoading] = useState<boolean>(false)
+    const [showResetPassword, setShowResetPassword] = useState<boolean>(false)
+    const [resetMessage, setResetMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
+    const [resetLoading, setResetLoading] = useState<boolean>(false)
     const [orders, setOrders] = useState<Order[]>([])
     const [ordersLoading, setOrdersLoading] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -130,6 +137,70 @@ const MyAccount = () => {
         setShowCancelPopup(false)
         setOrderToCancel(null)
     }
+
+    const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setPasswordLoading(true);
+        setPasswordMessage(null);
+
+        const formData = new FormData(e.currentTarget);
+        const currentPassword = formData.get('currentPassword') as string;
+        const newPassword = formData.get('newPassword') as string;
+        const confirmPassword = formData.get('confirmPassword') as string;
+
+        // Validate passwords match
+        if (newPassword !== confirmPassword) {
+            setPasswordMessage({ type: 'error', text: 'New passwords do not match' });
+            setPasswordLoading(false);
+            return;
+        }
+
+        // Validate password length
+        if (newPassword.length < 6) {
+            setPasswordMessage({ type: 'error', text: 'Password must be at least 6 characters long' });
+            setPasswordLoading(false);
+            return;
+        }
+
+        try {
+            await changePassword(currentPassword, newPassword);
+            setPasswordMessage({ type: 'success', text: 'Password updated successfully!' });
+            setShowPasswordForm(false);
+            // Reset form
+            (e.target as HTMLFormElement).reset();
+        } catch (error: any) {
+            setPasswordMessage({ type: 'error', text: error.message || 'Failed to update password' });
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
+
+    const handlePasswordReset = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setResetLoading(true);
+        setResetMessage(null);
+
+        const formData = new FormData(e.currentTarget);
+        const email = formData.get('resetEmail') as string;
+
+        if (!email) {
+            setResetMessage({ type: 'error', text: 'Please enter your email address' });
+            setResetLoading(false);
+            return;
+        }
+
+        try {
+            await resetPassword(email);
+            setResetMessage({ type: 'success', text: 'Password reset email sent! Check your inbox and spam folder.' });
+            setShowResetPassword(false);
+            // Reset form
+            (e.target as HTMLFormElement).reset();
+        } catch (error: any) {
+            setResetMessage({ type: 'error', text: error.message || 'Failed to send password reset email' });
+        } finally {
+            setResetLoading(false);
+        }
+    };
 
     const fetchAddresses = useCallback(async () => {
         if (!user) return
@@ -950,6 +1021,150 @@ const MyAccount = () => {
                                         <button type="submit" className="button-main">Save Changes</button>
                                     </div>
                                 </form>
+
+                                {/* Password Change Section */}
+                                <div className="mt-8 pt-8 border-t border-line">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h6 className="heading6">Change Password</h6>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowResetPassword(!showResetPassword)}
+                                                className="button-main bg-black"
+                                            >
+                                                {showResetPassword ? 'Cancel' : 'Forgot Password?'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPasswordForm(!showPasswordForm)}
+                                                className="button-main bg-secondary/90 text-white hover:bg-secondary/90"
+                                            >
+                                                {showPasswordForm ? 'Cancel' : 'Change Password'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {showPasswordForm && (
+                                        <form onSubmit={handlePasswordChange}>
+                                            {passwordMessage && (
+                                                <div className={`p-4 rounded-lg mb-4 ${
+                                                    passwordMessage.type === 'success' 
+                                                        ? 'bg-green-100 text-green-800 border border-green-200' 
+                                                        : 'bg-red-100 text-red-800 border border-red-200'
+                                                }`}>
+                                                    {passwordMessage.text}
+                                                </div>
+                                            )}
+                                            
+                                            <div className="grid sm:grid-cols-1 gap-4 gap-y-5">
+                                                <div className="current-password">
+                                                    <label htmlFor="currentPassword" className="caption1 capitalize">
+                                                        Current Password <span className="text-red">*</span>
+                                                    </label>
+                                                    <input 
+                                                        className="border-line mt-2 px-4 py-3 w-full rounded-lg" 
+                                                        id="currentPassword" 
+                                                        name="currentPassword"
+                                                        type="password" 
+                                                        placeholder="Enter current password" 
+                                                        required 
+                                                    />
+                                                </div>
+                                                <div className="new-password">
+                                                    <label htmlFor="newPassword" className="caption1 capitalize">
+                                                        New Password <span className="text-red">*</span>
+                                                    </label>
+                                                    <input 
+                                                        className="border-line mt-2 px-4 py-3 w-full rounded-lg" 
+                                                        id="newPassword" 
+                                                        name="newPassword"
+                                                        type="password" 
+                                                        placeholder="Enter new password" 
+                                                        required 
+                                                        minLength={6}
+                                                    />
+                                                </div>
+                                                <div className="confirm-password">
+                                                    <label htmlFor="confirmPassword" className="caption1 capitalize">
+                                                        Confirm New Password <span className="text-red">*</span>
+                                                    </label>
+                                                    <input 
+                                                        className="border-line mt-2 px-4 py-3 w-full rounded-lg" 
+                                                        id="confirmPassword" 
+                                                        name="confirmPassword"
+                                                        type="password" 
+                                                        placeholder="Confirm new password" 
+                                                        required 
+                                                        minLength={6}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="block-button lg:mt-6 mt-4">
+                                                <button 
+                                                    type="submit" 
+                                                    className="button-main bg-green text-white hover:bg-green/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    disabled={passwordLoading}
+                                                >
+                                                    {passwordLoading ? 'Updating...' : 'Update Password'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
+
+                                    {/* Password Reset Form */}
+                                    {showResetPassword && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                            <h6 className="heading6 text-blue-800 mb-4">Reset Your Password</h6>
+                                            <p className="text-blue-700 mb-4">
+                                                Don&apos;t know your current password? No problem! Enter your email address and we&apos;ll send you a password reset link.
+                                            </p>
+                                            
+                                            <form onSubmit={handlePasswordReset}>
+                                                {resetMessage && (
+                                                    <div className={`p-4 rounded-lg mb-4 ${
+                                                        resetMessage.type === 'success' 
+                                                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                                                            : 'bg-red-100 text-red-800 border border-red-200'
+                                                    }`}>
+                                                        {resetMessage.text}
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="mb-4">
+                                                    <label htmlFor="resetEmail" className="caption1 capitalize block mb-2">
+                                                        Email Address <span className="text-red">*</span>
+                                                    </label>
+                                                    <input 
+                                                        className="border-line border-black px-4 py-3 w-full rounded-lg" 
+                                                        id="resetEmail" 
+                                                        name="resetEmail"
+                                                        type="email" 
+                                                        placeholder="Enter your email address" 
+                                                        defaultValue={userData?.email || ''}
+                                                        required 
+                                                    />
+                                                </div>
+                                                
+                                                <div className="flex gap-3">
+                                                    <button 
+                                                        type="submit" 
+                                                        className="button-main bg-black"
+                                                        disabled={resetLoading}
+                                                    >
+                                                        {resetLoading ? 'Sending...' : 'Send Reset Email'}
+                                                    </button>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setShowResetPassword(false)}
+                                                        className="button-main bg-gray-500 text-white hover:bg-gray-600"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
