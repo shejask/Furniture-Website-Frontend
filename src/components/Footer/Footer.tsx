@@ -36,7 +36,7 @@ const Footer = () => {
                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/pages/about'}>About Us </Link>
                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/pages/become-a-seller'}>Become a Seller</Link>
                                          <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/my-account'}>My Account</Link>
-                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/pages/faqs'}>FAQ </Link>
+                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/blog'}>Blog </Link>
 
                                         {/* <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/order-tracking'}>Order & Returns</Link> */}
                                      </div>
@@ -49,7 +49,7 @@ const Footer = () => {
                                     </div>
                                     <div className="item flex flex-col basis-1/3 ">
                                         <div className="text-button-uppercase pb-3">Customer Services</div>
-                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/pages/faqs'}>FAQ</Link>
+                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/blog'}>Blog</Link>
                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/privacy-policy'}>Privacy Policy</Link>
                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/terms-and-conditions'}>Terms & Conditions</Link>
                                         <Link className='caption1 has-line-before duration-300 w-fit pt-2' href={'/return-policy'}>Return & Refund Policy</Link>

@@ -1305,7 +1305,21 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                         setReviewErrorMessage('Please login to submit a review');
                                         return;
                                     }
-                                    const user = JSON.parse(userStr);
+                                    
+                                    let user;
+                                    try {
+                                        user = JSON.parse(userStr);
+                                    } catch (parseError) {
+                                        console.error('Error parsing user data:', parseError);
+                                        setReviewErrorMessage('Invalid user data. Please login again.');
+                                        return;
+                                    }
+                                    
+                                    // Validate user object
+                                    if (!user || !user.uid || !user.name || !user.email) {
+                                        setReviewErrorMessage('Invalid user data. Please login again.');
+                                        return;
+                                    }
 
                                     // Upload images if any
                                     if (files && files.length > 0) {
@@ -1324,10 +1338,24 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                         return;
                                     }
 
+                                    // Validate required fields
+                                    const title = formData.get('title')?.toString().trim();
+                                    const message = formData.get('message')?.toString().trim();
+                                    
+                                    if (!title || title.length < 3) {
+                                        setReviewErrorMessage('Please enter a review title with at least 3 characters');
+                                        return;
+                                    }
+                                    
+                                    if (!message || message.length < 10) {
+                                        setReviewErrorMessage('Please enter a review message with at least 10 characters');
+                                        return;
+                                    }
+
                                     // Create review object
                                     const review = {
-                                        title: formData.get('title'),
-                                        message: formData.get('message'),
+                                        title: title,
+                                        message: message,
                                         rating: reviewRating,
                                         images: imageUrls,
                                         userId: user.uid,
@@ -1338,8 +1366,20 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     };
 
                                     // Save to Firebase
+                                    console.log('🔥 Submitting review:', {
+                                        productId: productMain.id,
+                                        userId: user.uid,
+                                        userName: user.name,
+                                        title: title,
+                                        rating: reviewRating,
+                                        messageLength: message.length,
+                                        imageCount: imageUrls.length
+                                    });
+                                    
                                     const reviewsRef = ref(database, `/products/${productMain.id}/reviews/${Date.now()}`);
                                     await set(reviewsRef, review);
+                                    
+                                    console.log('✅ Review submitted successfully');
 
                                     setReviewSuccessMessage('Review submitted successfully!');
                                     setReviewErrorMessage(null);
@@ -1355,7 +1395,23 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     }, 5000);
                                 } catch (error) {
                                     console.error('Error submitting review:', error);
-                                    setReviewErrorMessage('Failed to submit review. Please try again.');
+                                    
+                                    // Provide more specific error messages
+                                    let errorMessage = 'Failed to submit review. Please try again.';
+                                    
+                                    if (error instanceof Error) {
+                                        if (error.message.includes('permission')) {
+                                            errorMessage = 'You do not have permission to submit a review. Please check your login status.';
+                                        } else if (error.message.includes('network')) {
+                                            errorMessage = 'Network error. Please check your internet connection and try again.';
+                                        } else if (error.message.includes('storage')) {
+                                            errorMessage = 'Error uploading images. Please try again with smaller images.';
+                                        } else if (error.message.includes('database')) {
+                                            errorMessage = 'Database error. Please try again in a moment.';
+                                        }
+                                    }
+                                    
+                                    setReviewErrorMessage(errorMessage);
                                     setReviewSuccessMessage(null);
                                 }
                             }}>
