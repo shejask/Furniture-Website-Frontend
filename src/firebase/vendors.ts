@@ -53,4 +53,33 @@ export const fetchVendors = async (): Promise<Vendor[]> => {
   }
 }
 
+// Get vendor details by ID
+export const getVendorById = async (vendorId: string): Promise<Vendor | null> => {
+  try {
+    const vendorRef = ref(database, `/vendors/${vendorId}`)
+    const snapshot = await get(vendorRef)
+    
+    if (snapshot.exists()) {
+      const data = snapshot.val() as Partial<Vendor>
+      return {
+        id: vendorId,
+        businessName: data.businessName,
+        storeName: data.storeName,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        mobile: data.mobile,
+        status: data.status || 'active',
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Failed to fetch vendor by ID:', error)
+    return null
+  }
+}
+
 

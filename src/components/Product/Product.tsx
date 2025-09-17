@@ -46,6 +46,10 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
     }
 
     const handleAddToCart = () => {
+        // Don't add to cart if stock is 0
+        if (data.quantity === 0) {
+            return;
+        }
         addToCart({ 
             ...data, 
             selectedSize: activeSize, 
@@ -260,13 +264,19 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                                     )}
                                     {data.action === 'add to cart' ? (
                                         <div
-                                            className="add-cart-btn w-full text-button-uppercase py-2 text-center rounded-full duration-500 bg-white hover:bg-black hover:text-white"
+                                            className={`add-cart-btn w-full text-button-uppercase py-2 text-center rounded-full duration-500 ${
+                                                data.quantity > 0 
+                                                    ? 'bg-white hover:bg-black hover:text-white cursor-pointer' 
+                                                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                            }`}
                                             onClick={e => {
                                                 e.stopPropagation();
-                                                handleAddToCart()
+                                                if (data.quantity > 0) {
+                                                    handleAddToCart()
+                                                }
                                             }}
                                         >
-                                            Add To Cart
+                                            {data.quantity > 0 ? 'Add To Cart' : 'Out of Stock'}
                                         </div>
                                     ) : (
                                         <>
@@ -458,6 +468,12 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                                 <div className="product-price text-title">₹{displayPrice}.00</div>
 
                             </div>
+                            {/* Stock finished message - only show when stock is 0 */}
+                            {data.quantity === 0 && (
+                                <div className="stock-message mt-1">
+                                    <span className="text-sm text-red font-medium">Stock finished</span>
+                                </div>
+                            )}
                             {data.rating && (
                                 <div className="flex items-center mt-2">
                                     <div className="flex items-center">
@@ -575,6 +591,12 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                                                     </div>
                                                 )}
                                             </div>
+                                            {/* Stock finished message - only show when stock is 0 */}
+                                            {data.quantity === 0 && (
+                                                <div className="stock-message mt-1">
+                                                    <span className="text-sm text-red font-medium">Stock finished</span>
+                                                </div>
+                                            )}
                                             {data.rating && (
                                                 <div className="flex items-center mt-2">
                                                     <div className="flex items-center">
@@ -731,6 +753,12 @@ const Product: React.FC<ProductProps> = ({ data, type, style }) => {
                             <Rate currentRate={data.rate} size={16} />
                         </div>
                         <span className="text-title inline-block mt-1">₹{displayPrice}.00</span>
+                        {/* Stock finished message - only show when stock is 0 */}
+                        {data.quantity === 0 && (
+                            <div className="stock-message mt-1">
+                                <span className="text-sm text-red font-medium">Stock finished</span>
+                            </div>
+                        )}
                         {data.rating && (
                             <div className="flex items-center mt-2">
                                 <div className="flex items-center">

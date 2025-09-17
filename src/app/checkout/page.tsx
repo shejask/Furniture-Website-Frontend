@@ -16,7 +16,8 @@ import { useAuthState } from 'react-firebase-hooks/auth'
 import { auth } from '@/firebase/config'
 import { useAddresses } from '@/hooks/useAddresses'
 import { Address, getUserAddresses } from '@/firebase/addresses'
-import { saveOrder, Order, OrderItem, OrderAddress } from '@/firebase/orders'
+import { saveOrder, saveIndividualOrders, Order, OrderItem, OrderAddress } from '@/firebase/orders'
+import { getVendorById, Vendor } from '@/firebase/vendors'
 import { getShippingRates, getShippingCostForCitySync, ShippingData } from '@/firebase/shipping'
 import { getCouponByCode, computeCouponDiscount, CouponRecord } from '@/firebase/coupons'
 import { getTaxById, TaxType } from '@/firebase/taxes'
@@ -130,12 +131,12 @@ const Checkout = () => {
         }
     }, [taxDataCache, taxLoadingCache]);
 
-    // Function to fetch product data and update cart items with taxId
+    // Function to fetch product data and update cart items with taxId and commissionAmount
     const updateCartItemsWithTaxId = React.useCallback(async () => {
         for (const cartItem of displayCartItems) {
-            if (!(cartItem as any).taxId) {
+            if (!(cartItem as any).taxId || !(cartItem as any).commissionAmount) {
                 try {
-                    // Fetch the product data from Firebase to get the taxId
+                    // Fetch the product data from Firebase to get the taxId and commissionAmount
                     const productRef = ref(database, `/products/${cartItem.id}`);
                     const snapshot = await get(productRef);
                     
@@ -148,6 +149,11 @@ const Checkout = () => {
                             
                             // Fetch tax data
                             fetchTaxData(productData.taxId);
+                        }
+                        
+                        // Update commissionAmount if available
+                        if (productData.commissionAmount !== undefined) {
+                            (cartItem as any).commissionAmount = productData.commissionAmount;
                         }
                         
                         // Update rating if available, otherwise use default
@@ -369,7 +375,9 @@ const Checkout = () => {
     const calculatedTotalCart = displayCartItems.reduce((total, item) => {
         return total + (((item as any).salePrice ?? item.price) * item.quantity);
     }, 0);
-    const finalAmount = calculatedTotalCart - discountAmount + (isFreeShippingApplied ? 0 : (currentShippingCost || 0))
+    // Calculate total shipping cost (per product × number of products)
+    const totalShippingCost = isFreeShippingApplied ? 0 : (currentShippingCost || 0) * displayCartItems.length;
+    const finalAmount = calculatedTotalCart - discountAmount + totalShippingCost
 
     const handleApplyCoupon = async () => {
         setCouponError('')
@@ -566,8 +574,18 @@ const Checkout = () => {
                 orderItem.thumbImage = item.thumbImage;
             }
 
+            if ((item as any).commissionAmount !== undefined && (item as any).commissionAmount !== null) {
+                orderItem.commissionAmount = (item as any).commissionAmount;
+            }
+
             return orderItem;
         });
+
+        // Calculate total commission from all items
+        const totalCommission = orderItems.reduce((total, item) => {
+            const itemCommission = item.commissionAmount || 0;
+            return total + (itemCommission * item.quantity);
+        }, 0);
 
         // Create order address from form data
         const orderAddress: OrderAddress = {
@@ -602,7 +620,8 @@ const Checkout = () => {
             subtotal: calculatedTotalCart,
             discount: discountAmount,
             shipping: isFreeShippingApplied ? 0 : currentShippingCost,
-            total: finalAmount
+            total: finalAmount,
+            totalCommission: totalCommission
         };
 
         // Only add optional properties if they have values
@@ -637,6 +656,156 @@ const Checkout = () => {
         return orderData;
     };
 
+    // Create individual orders for each product
+    const createIndividualOrders = async (paymentMethod: 'razorpay' | 'cash-delivery', razorpayPaymentId?: string, razorpayOrderId?: string): Promise<Omit<Order, 'id' | 'createdAt' | 'updatedAt'>[]> => {
+        if (!user?.uid) {
+            throw new Error('User must be logged in to create an order');
+        }
+
+        // Generate a clean parent order ID
+        const generateOrderId = () => {
+            const timestamp = Date.now();
+            const randomPart = Math.random().toString(36).substr(2, 6).toUpperCase();
+            return `ORD${timestamp.toString().slice(-8)}${randomPart}`;
+        };
+        
+        const parentOrderId = razorpayOrderId || generateOrderId();
+        
+        // Debug: Log cart items to check vendor information
+        console.log('Cart items in createIndividualOrders:', displayCartItems.map(item => ({
+            name: item.name,
+            vendor: item.vendor,
+            id: item.id
+        })));
+        
+        // Create order address from form data
+        const orderAddress: OrderAddress = {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            phone: formData.phone,
+            country: formData.country,
+            city: formData.city,
+            streetAddress: formData.streetAddress,
+            state: formData.state,
+            zip: formData.zip,
+            addressName: `${formData.streetAddress}, ${formData.city}`
+        };
+
+        // Validate address data
+        const requiredAddressFields = ['firstName', 'lastName', 'phone', 'country', 'city', 'streetAddress', 'state', 'zip'];
+        const missingAddressFields = requiredAddressFields.filter(field => !orderAddress[field as keyof OrderAddress]);
+        if (missingAddressFields.length > 0) {
+            throw new Error(`Missing required address fields: ${missingAddressFields.join(', ')}`);
+        }
+
+        // Calculate per-product shipping cost
+        // If free shipping is applied, per-product shipping is 0
+        // Otherwise, calculate shipping per product (not per quantity)
+        const perProductShipping = isFreeShippingApplied ? 0 : currentShippingCost;
+        const totalItems = displayCartItems.reduce((sum, item) => sum + item.quantity, 0);
+        const perItemDiscount = totalItems > 0 ? discountAmount / totalItems : 0;
+
+        // Create individual orders for each cart item
+        const individualOrders: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+        
+        for (let index = 0; index < displayCartItems.length; index++) {
+            const item = displayCartItems[index];
+            const actualPrice = (item as any).salePrice ?? item.price;
+            const itemSubtotal = actualPrice * item.quantity;
+            // Calculate shipping per product (not per quantity)
+            // If customer has 2 products and shipping is ₹100 per product, total shipping = ₹200
+            const itemShipping = perProductShipping;
+            const itemDiscount = perItemDiscount * item.quantity;
+            const itemTotal = itemSubtotal + itemShipping - itemDiscount;
+
+            // Generate individual order ID - use parent order ID for single item, or append item number for multiple items
+            const orderId = displayCartItems.length === 1 ? parentOrderId : `${parentOrderId}-${index + 1}`;
+
+            // Fetch vendor information for this product
+            let vendorInfo: Vendor | null = null;
+            console.log('Processing product:', item.name, 'Vendor ID:', item.vendor);
+            if (item.vendor) {
+                try {
+                    vendorInfo = await getVendorById(item.vendor);
+                    console.log('Fetched vendor info:', vendorInfo);
+                } catch (error) {
+                    console.error('Error fetching vendor info for product:', item.id, error);
+                }
+            } else {
+                console.log('No vendor ID found for product:', item.name);
+            }
+
+            // Convert single item to order item
+            const orderItem: OrderItem = {
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                ...(item.salePrice !== undefined && item.salePrice !== null && { salePrice: item.salePrice }),
+                ...(item.selectedSize && { selectedSize: item.selectedSize }),
+                ...(item.selectedColor && { selectedColor: item.selectedColor }),
+                ...(item.thumbImage && { thumbImage: item.thumbImage }),
+                ...(item.vendor && { vendor: item.vendor }),
+                ...((item as any).commissionAmount !== undefined && (item as any).commissionAmount !== null && { commissionAmount: (item as any).commissionAmount }),
+                ...(vendorInfo && { 
+                    vendorName: vendorInfo.businessName || vendorInfo.storeName || vendorInfo.name,
+                    vendorEmail: vendorInfo.email 
+                })
+            };
+
+            // Calculate total commission for this individual order (single item)
+            const itemTotalCommission = ((item as any).commissionAmount || 0) * item.quantity;
+
+            const orderData: any = {
+                orderId,
+                parentOrderId,
+                userId: user.uid,
+                userEmail: user.email || '',
+                items: [orderItem],
+                address: orderAddress,
+                paymentMethod,
+                paymentStatus: paymentMethod === 'razorpay' ? 'completed' : 'pending',
+                orderStatus: 'pending',
+                subtotal: itemSubtotal,
+                discount: itemDiscount,
+                shipping: itemShipping,
+                total: itemTotal,
+                totalCommission: itemTotalCommission,
+                // Add vendor information to the order
+                ...(item.vendor && { vendor: item.vendor }),
+                ...(vendorInfo && { 
+                    vendorName: vendorInfo.businessName || vendorInfo.storeName || vendorInfo.name,
+                    vendorEmail: vendorInfo.email 
+                })
+            };
+
+            // Only add optional properties if they have values
+            if (orderNote && orderNote.trim()) {
+                orderData.orderNote = orderNote.trim();
+            }
+            
+            if (appliedCoupon && appliedCoupon.code) {
+                orderData.couponCode = appliedCoupon.code;
+                orderData.couponType = appliedCoupon.type;
+                if (isFreeShippingApplied) {
+                    orderData.freeShippingApplied = true;
+                }
+            }
+            
+            if (razorpayPaymentId) {
+                orderData.razorpayPaymentId = razorpayPaymentId;
+            }
+            
+            if (razorpayOrderId) {
+                orderData.razorpayOrderId = razorpayOrderId;
+            }
+
+            individualOrders.push(orderData);
+        }
+
+        return individualOrders;
+    };
+
     const handleRazorpayPayment = async () => {
         if (!formData.firstName || !formData.lastName || !formData.phone) {
             showMessage('error', 'Please fill in all required address fields')
@@ -657,15 +826,16 @@ const Checkout = () => {
                 // Show loading overlay immediately after payment success
                 setIsPaymentProcessing(true)
                 
-                let orderData: any = null;
+                let individualOrders: any[] | null = null;
                 try {
-                    // Create and save order
-                    orderData = createOrderData('razorpay', response.razorpay_payment_id, response.razorpay_order_id);
-                    const savedOrderId = await saveOrder(orderData);
+                    // Create individual orders for each product
+                    individualOrders = await createIndividualOrders('razorpay', response.razorpay_payment_id, response.razorpay_order_id);
+                    const parentOrderId = individualOrders[0]?.parentOrderId || response.razorpay_order_id;
+                    const savedOrderIds = await saveIndividualOrders(parentOrderId, individualOrders);
                     
                     // Clear cart and redirect
                     clearCart()
-                    router.push(`/payment/success?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&amount=${finalAmount}`)
+                    router.push(`/payment/success?payment_id=${response.razorpay_payment_id}&order_id=${parentOrderId}&amount=${finalAmount}`)
                 } catch (error) {
                     // Error saving order
                     showMessage('error', `Payment successful but failed to save order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please contact support with order ID: ${response.razorpay_order_id}`);
@@ -767,14 +937,21 @@ const Checkout = () => {
         } else if (activePayment === 'cash-delivery') {
             // Handle COD
             setIsPaymentProcessing(true)
-            let orderData: any = null;
+            let individualOrders: any[] | null = null;
             try {
-                orderData = createOrderData('cash-delivery');
-                const savedOrderId = await saveOrder(orderData);
+                // Create individual orders for each product
+                individualOrders = await createIndividualOrders('cash-delivery');
+                const parentOrderId = individualOrders[0]?.parentOrderId;
+                const savedOrderIds = await saveIndividualOrders(parentOrderId, individualOrders);
                 
                 showMessage('success', 'COD order placed successfully!')
                 clearCart()
-                router.push(`/order-tracking?order_id=${orderData.orderId}`)
+                
+                // Calculate total amount for success page
+                const totalAmount = individualOrders.reduce((sum, order) => sum + order.total, 0);
+                
+                // Navigate to success page with order details
+                router.push(`/payment/success?order_id=${parentOrderId}&amount=${totalAmount}&payment_method=cod`)
             } catch (error) {
                 // Error saving COD order
                 showMessage('error', `Failed to save COD order. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
@@ -1381,10 +1558,11 @@ const Checkout = () => {
                                             </>
                                         ) : (
                                             <>
-                                                {!currentShippingCost || currentShippingCost === 0 ? 'Free' : `₹${currentShippingCost}.00`}
+                                                {!totalShippingCost || totalShippingCost === 0 ? 'Free' : `₹${totalShippingCost}.00`}
                                                 {selectedAddress && (
                                                     <div className="text-xs text-secondary mt-1">
                                                         to {selectedAddress.city}, {selectedAddress.state}
+                                                        
                                                     </div>
                                                 )}
                                             </>

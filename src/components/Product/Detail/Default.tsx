@@ -580,8 +580,11 @@ const Default: React.FC<Props> = ({ data, productId }) => {
     }
 
     const handleIncreaseQuantity = () => {
-        productMain.quantityPurchase += 1
-        updateCart(productMain.id, productMain.quantityPurchase + 1, activeSize, activeColor);
+        // Check if we can increase quantity (don't exceed stock)
+        if (productMain.quantityPurchase < productMain.quantity) {
+            productMain.quantityPurchase += 1
+            updateCart(productMain.id, productMain.quantityPurchase + 1, activeSize, activeColor);
+        }
     };
 
     const handleDecreaseQuantity = () => {
@@ -852,24 +855,52 @@ const Default: React.FC<Props> = ({ data, productId }) => {
                                     </div>
                                 </div> */}
                                 <div className="text-title mt-5">Quantity:</div>
+                                {/* Stock Display */}
+                                <div className="stock-info mb-2">
+                                    <span className="text-sm text-secondary">
+                                        Stock: <span className={`font-medium ${productMain.quantity > 0 ? 'text-green' : 'text-red'}`}>
+                                            {productMain.quantity > 0 ? `${productMain.quantity} available` : 'Out of stock'}
+                                        </span>
+                                    </span>
+                                </div>
                                 <div className="choose-quantity flex items-center lg:justify-between gap-5 gap-y-3 mt-3">
-                                    <div className="quantity-block md:p-3 max-md:py-1.5 max-md:px-3 flex items-center justify-between rounded-lg border border-line sm:w-[180px] w-[120px] flex-shrink-0">
+                                    <div className={`quantity-block md:p-3 max-md:py-1.5 max-md:px-3 flex items-center justify-between rounded-lg border border-line sm:w-[180px] w-[120px] flex-shrink-0 ${
+                                        productMain.quantity === 0 ? 'bg-gray-100' : ''
+                                    }`}>
                                         <Icon.Minus
                                             size={20}
-                                            onClick={handleDecreaseQuantity}
-                                            className={`${productMain.quantityPurchase === 1 ? 'disabled' : ''} cursor-pointer`}
+                                            onClick={productMain.quantity > 0 ? handleDecreaseQuantity : undefined}
+                                            className={`${productMain.quantityPurchase === 1 || productMain.quantity === 0 ? 'disabled' : ''} ${productMain.quantity > 0 ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                         />
                                         <div className="body1 font-semibold">{productMain.quantityPurchase}</div>
                                         <Icon.Plus
                                             size={20}
-                                            onClick={handleIncreaseQuantity}
-                                            className='cursor-pointer'
+                                            onClick={productMain.quantity > 0 ? handleIncreaseQuantity : undefined}
+                                            className={`${productMain.quantityPurchase >= productMain.quantity || productMain.quantity === 0 ? 'disabled' : ''} ${productMain.quantity > 0 ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                         />
                                     </div>
-                                    <div onClick={handleAddToCart} className="button-main w-full text-center bg-white text-black border border-black">Add To Cart</div>
+                                    <div 
+                                        onClick={productMain.quantity > 0 ? handleAddToCart : undefined} 
+                                        className={`button-main w-full text-center border border-black ${
+                                            productMain.quantity > 0 
+                                                ? 'bg-white text-black cursor-pointer hover:bg-black hover:text-white' 
+                                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {productMain.quantity > 0 ? 'Add To Cart' : 'Out of Stock'}
+                                    </div>
                                 </div>
                                 <div className="button-block mt-5">
-                                    <div onClick={handleBuyNow} className="button-main w-full text-center cursor-pointer">Buy It Now</div>
+                                    <div 
+                                        onClick={productMain.quantity > 0 ? handleBuyNow : undefined} 
+                                        className={`button-main w-full text-center ${
+                                            productMain.quantity > 0 
+                                                ? 'cursor-pointer' 
+                                                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {productMain.quantity > 0 ? 'Buy It Now' : 'Out of Stock'}
+                                    </div>
                                 </div>
                                 <div className="flex items-center lg:gap-20 gap-8 mt-5 pb-6 border-b border-line">
                                     <div className="share flex items-center gap-3 cursor-pointer">

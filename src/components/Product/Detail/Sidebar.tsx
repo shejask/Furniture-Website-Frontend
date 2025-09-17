@@ -386,6 +386,14 @@ const Sidebar: React.FC<Props> = ({ data, productId }) => {
                                             </div>
                                         </div>
                                         <div className="text-title mt-5">Quantity:</div>
+                                        {/* Stock Display */}
+                                        <div className="stock-info mb-2">
+                                            <span className="text-sm text-secondary">
+                                                Stock: <span className={`font-medium ${productMain.quantity > 0 ? 'text-green' : 'text-red'}`}>
+                                                    {productMain.quantity > 0 ? `${productMain.quantity} available` : 'Out of stock'}
+                                                </span>
+                                            </span>
+                                        </div>
                                         <div className="choose-quantity flex items-center lg:justify-between gap-5 gap-y-3 mt-3">
                                             <div className="quantity-block md:p-3 max-md:py-1.5 max-md:px-3 flex items-center justify-between rounded-lg border border-line sm:w-[180px] w-[120px] flex-shrink-0">
                                                 <Icon.Minus
@@ -400,10 +408,28 @@ const Sidebar: React.FC<Props> = ({ data, productId }) => {
                                                     className='cursor-pointer'
                                                 />
                                             </div>
-                                            <div onClick={handleAddToCart} className="button-main w-full text-center bg-white text-black border border-black">Add To Cart</div>
+                                            <div 
+                                                onClick={productMain.quantity > 0 ? handleAddToCart : undefined} 
+                                                className={`button-main w-full text-center border border-black ${
+                                                    productMain.quantity > 0 
+                                                        ? 'bg-white text-black cursor-pointer hover:bg-black hover:text-white' 
+                                                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                {productMain.quantity > 0 ? 'Add To Cart' : 'Out of Stock'}
+                                            </div>
                                         </div>
                                         <div className="button-block mt-5">
-                                            <div className="button-main w-full text-center">Buy It Now</div>
+                                            <div 
+                                                onClick={productMain.quantity > 0 ? handleBuyNow : undefined} 
+                                                className={`button-main w-full text-center ${
+                                                    productMain.quantity > 0 
+                                                        ? 'cursor-pointer' 
+                                                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                                }`}
+                                            >
+                                                {productMain.quantity > 0 ? 'Buy It Now' : 'Out of Stock'}
+                                            </div>
                                         </div>
                                         <div className="flex items-center lg:gap-20 gap-8 mt-5">
                                             <div className="compare flex items-center gap-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleAddToCompare() }}>

@@ -201,6 +201,7 @@ export const CartProviderWithSync: React.FC<{ children: React.ReactNode }> = ({ 
                     description: '',
                     action: 'add to cart',
                     slug: p?.slug || (p?.id || ''),
+                    vendor: p?.vendor || '', // Add vendor information
                     // CartItem extras
                     selectedSize: p?.selectedSize || '',
                     selectedColor: p?.selectedColor || ''

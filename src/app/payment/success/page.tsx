@@ -17,14 +17,18 @@ const PaymentSuccess = () => {
     const paymentId = searchParams.get('payment_id')
     const orderId = searchParams.get('order_id')
     const amount = searchParams.get('amount')
+    const paymentMethod = searchParams.get('payment_method')
+
+    // Determine if this is a COD order
+    const isCOD = paymentMethod === 'cod'
 
     useEffect(() => {
         // You can add analytics tracking here
         if (typeof window !== 'undefined') {
             // Track successful payment
-            console.log('Payment successful:', { paymentId, orderId, amount })
+            console.log('Order placed successfully:', { paymentId, orderId, amount, paymentMethod })
         }
-    }, [paymentId, orderId, amount])
+    }, [paymentId, orderId, amount, paymentMethod])
 
     return (
         <>
@@ -41,25 +45,32 @@ const PaymentSuccess = () => {
                             <Icon.CheckCircle className="text-white text-4xl" />
                         </div>
                         
-                        <h1 className="heading3 mb-4">Payment Successful!</h1>
+                        <h1 className="heading3 mb-4">
+                            {isCOD ? 'Order Placed Successfully!' : 'Payment Successful!'}
+                        </h1>
                         <p className="text-secondary text-lg mb-8 max-w-md">
-                            Thank you for your purchase. Your order has been successfully placed and will be processed shortly.
+                            {isCOD 
+                                ? 'Thank you for your order! Your order has been successfully placed and will be processed shortly. Payment will be collected upon delivery.'
+                                : 'Thank you for your purchase. Your order has been successfully placed and will be processed shortly.'
+                            }
                         </p>
                         
-                        {paymentId && (
-                            <div className="payment-details bg-surface p-6 rounded-lg mb-8 max-w-md w-full">
-                                <h3 className="heading6 mb-4">Payment Details</h3>
+                        {(orderId || paymentId || amount) && (
+                            <div className="order-details bg-surface p-6 rounded-lg mb-8 max-w-md w-full">
+                                <h3 className="heading6 mb-4">
+                                    {isCOD ? 'Order Details' : 'Payment Details'}
+                                </h3>
                                 <div className="details-list space-y-2 text-sm">
-                                    {paymentId && (
-                                        <div className="flex justify-between">
-                                            <span className="text-secondary">Payment ID:</span>
-                                            <span className="font-medium">{paymentId}</span>
-                                        </div>
-                                    )}
                                     {orderId && (
                                         <div className="flex justify-between">
                                             <span className="text-secondary">Order ID:</span>
                                             <span className="font-medium">{orderId}</span>
+                                        </div>
+                                    )}
+                                    {paymentId && (
+                                        <div className="flex justify-between">
+                                            <span className="text-secondary">Payment ID:</span>
+                                            <span className="font-medium">{paymentId}</span>
                                         </div>
                                     )}
                                     {amount && (
@@ -68,6 +79,12 @@ const PaymentSuccess = () => {
                                             <span className="font-medium">₹{amount}</span>
                                         </div>
                                     )}
+                                    <div className="flex justify-between">
+                                        <span className="text-secondary">Payment Method:</span>
+                                        <span className="font-medium">
+                                            {isCOD ? 'Cash on Delivery' : 'Online Payment'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}

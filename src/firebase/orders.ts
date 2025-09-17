@@ -10,6 +10,10 @@ export interface OrderItem {
   selectedSize?: string;
   selectedColor?: string;
   thumbImage?: string[];
+  vendor?: string;
+  vendorName?: string;
+  vendorEmail?: string;
+  commissionAmount?: number;
 }
 
 export interface OrderAddress {
@@ -27,6 +31,7 @@ export interface OrderAddress {
 export interface Order {
   id?: string;
   orderId: string;
+  parentOrderId?: string; // For grouping individual product orders
   userId: string;
   userEmail: string;
   items: OrderItem[];
@@ -38,12 +43,17 @@ export interface Order {
   discount: number;
   shipping: number;
   total: number;
+  totalCommission: number;
   orderNote?: string;
   couponCode?: string;
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   shiprocketOrderId?: string;
   shiprocketShipmentId?: string;
+  // Vendor information (for single vendor orders)
+  vendor?: string;
+  vendorName?: string;
+  vendorEmail?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -76,6 +86,33 @@ export const saveOrder = async (order: Omit<Order, 'id' | 'createdAt' | 'updated
     return orderId;
   } catch (error) {
     console.error('Error saving order:', error);
+    throw error;
+  }
+};
+
+// Save multiple individual orders (one per product) with a parent order ID
+export const saveIndividualOrders = async (
+  parentOrderId: string,
+  orders: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>[]
+): Promise<string[]> => {
+  try {
+    const savedOrderIds: string[] = [];
+    
+    for (const order of orders) {
+      // Add parent order ID to each order
+      const orderWithParent = {
+        ...order,
+        parentOrderId: parentOrderId,
+      };
+      
+      const orderId = await saveOrder(orderWithParent);
+      savedOrderIds.push(orderId);
+    }
+
+    console.log('All individual orders saved successfully:', savedOrderIds);
+    return savedOrderIds;
+  } catch (error) {
+    console.error('Error saving individual orders:', error);
     throw error;
   }
 };

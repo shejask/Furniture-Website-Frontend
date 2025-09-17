@@ -16,6 +16,7 @@ interface CartItemPayload {
     selectedColor: string;
     subtotal: number;
     slug?: string;
+    vendor?: string; // Add vendor information
 }
 
 const buildCartItemPayload = (
@@ -38,7 +39,8 @@ const buildCartItemPayload = (
         selectedSize: selectedSize || '',
         selectedColor: selectedColor || '',
         subtotal: unit * safeQuantity,
-        slug: product.slug
+        slug: product.slug,
+        vendor: product.vendor // Add vendor information
     };
 };
 
