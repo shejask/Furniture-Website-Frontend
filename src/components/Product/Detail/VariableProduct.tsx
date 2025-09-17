@@ -85,6 +85,19 @@ const VariableProduct: React.FC<Props> = ({ data, productId }) => {
         });
         openModalCart()
     };
+
+    const handleBuyNow = () => {
+        // Add the current product to cart
+        addToCart({ 
+            ...productMain, 
+            selectedSize: activeSize, 
+            selectedColor: activeColor 
+        });
+        
+        // Redirect to checkout page with buyNow parameter
+        router.push('/checkout?buyNow=true');
+    };
+
     const handleAddToWishlist = () => {
         // if product existed in wishlit, remove from wishlist and set state to false
         if (wishlistState.wishlistArray.some(item => item.id === productMain.id)) {
